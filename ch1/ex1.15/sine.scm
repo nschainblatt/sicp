@@ -1,0 +1,26 @@
+(define counter 0)
+
+(define (main)
+  (sine-iter 0)
+  (newline))
+
+(define (sine-iter a)
+  (set! counter 0)
+  (sine a)
+  (display a)
+  (display " ")
+  (display counter)
+  (newline)
+  (if (< a 100) 
+	  (sine-iter (+ a 1))
+	  0))
+
+(define (sine a)
+ (define (cube x)
+   (* x x x))
+  (define (p x )
+    (set! counter (+ counter 1))
+    (- (* 3 x) (* 4 (cube x))))
+  (if (not (> (abs a) .1))
+    a
+    (p (sine (/ a 3.0)))))

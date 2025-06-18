@@ -1,0 +1,32 @@
+(sine 12.15)
+(p (sine (/ 12.15 3.0)))
+(p (sine 4.05))
+(p (p (sine (/ 4.05 3.0))))
+(p (p (sine 1.35)))
+(p (p (p (sine (/ 1.35 3.0)))))
+(p (p (p (sine 0.45))))
+(p (p (p (p (sine (/ 0.45 3.0))))))
+(p (p (p (p (sine 0.15)))))
+(p (p (p (p (p (sine (/ 0.15 3.0)))))))
+(p (p (p (p (p (sine 0.05))))))
+(p (p (p (p (p (0.05))))))
+
+a. Procedure p is applied 5 times when (sine 12.5) is evaluated.
+
+b.
+	Order of growth in space:
+
+	θ(log n) or Logarithmic
+
+	Why?
+	If the base case isn't met, the input (angle a) is divided by three until it is met.
+	This matches a common pattern to logarithmic algorithms, where the input is divided by a constant
+	until a base case is met.
+	
+
+	Order of grown in number of steps:
+
+	θ(log n) or Logarithmic
+
+	Why?
+	For the same reason as the space complexity answer.
