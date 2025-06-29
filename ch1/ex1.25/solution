@@ -1,0 +1,25 @@
+Alyssa P. Hacker is incorrect that we could have simply calculated the
+exponential using our earlier procedure fast-expt, and then calculate the
+remainder from it afterwards.
+
+She is incorrect because the base and product growing inside of fast-expt would continually grown extremely
+large when testing the primeality of large integers, such as a million from the previous question.
+
+This would calculate a random number between 1 and a million-1 to the power of a million, before ever applying modulus to the result.
+
+So inside fast-expt, each time the expt is even, we would be successively squaring the base (a potentially large random number to start with),
+and each time the expt is odd, we multiply the product by the base again, leaving the result much larger than M (the modulus).
+
+Computing very large products and squares is time consuming, so we mod the result by M because our goal isn't to compute the exact answer
+to a random number to the power of a million, we simply want to know if that random number to the power of a million mod M equals a the random number.
+(to see if it passes the Fermat test)
+
+The reason we would mod the square, and the new product each time inside fast-expt-mod is to keep the result below M, allowing the process
+to finish much faster.
+
+Alyssa's method would take a very long time for testing the primality of very large integers, because multiplication among these integers
+consumes large amounts of memory and requires additional algorithms to perform the multiplication. This is because the hardware itself cannot
+perform the multiplication as the numbers do not fit in cpu registers.
+
+This follows the rules of modular exponentiation where:
+b^e % m == (b^2)^(n/2) % m == (b^2 % m)^(n/2)
