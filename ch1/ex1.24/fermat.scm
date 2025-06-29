@@ -7,21 +7,24 @@
   (time-search-for-primes 3 1000)
   (time-search-for-primes 3 10000)
   (time-search-for-primes 3 100000)
-  (time-search-for-primes 3 1000000)
-  (time-search-for-primes 3 10000000)
-  (time-search-for-primes 3 100000000))
+  (time-search-for-primes 3 1000000))
 
 (define (time-search-for-primes n m)
+  (display "average time to find ")
   (display n)
-  (display " primes larger than ")
+  (display " primes greater than ")
   (display m)
   (display ": ")
-  (define start-time (current-inexact-monotonic-milliseconds))
-  (display (search-for-primes n m))
-  (display ", took: ")
-  (display (- (current-inexact-monotonic-milliseconds) start-time))
-  (display " milliseconds")
+  (display (time-search-for-primes-iter n m 100000 100000 0))
   (newline))
+
+; search for n primes greater than m, original-counter times, and return the average time taken for the n primes.
+(define (time-search-for-primes-iter n m counter original-counter time-sum)
+  (define start-time (current-inexact-monotonic-milliseconds))
+  (search-for-primes n m)
+  (if (= counter 0)
+    (/ time-sum original-counter)
+    (time-search-for-primes-iter n m (- counter 1) original-counter (+ time-sum (- (current-inexact-monotonic-milliseconds) start-time)))))
 
 ; searches for n primes greater than m, store them in a list
 (define (search-for-primes n m)
