@@ -1,0 +1,105 @@
+Louis's version of 'fast-prime?' is linear instead of the original logarithmic version.
+
+The original method, which squares the result of the recursive call is logarithmic because mit-scheme utilizes appicative order evaluation.
+In applicative order evaluation the operands are evaluated before being passed along to the called procedure. This allows the result from the 
+recursive call to be evaluated once, instead of twice during squaring.
+
+However with Louis's version, he doesn't make use of applicative order evaluation and instead does multiplication with two explicit recursive calls.
+Both of these recursive calls must be evaluated, and when called with another even exponent will then create two more recursive calls, and so on.
+This undoes the halving the logarithmic version does by doubling the work required to be done.
+
+Remember that the original logarithmic version halves the exponent whenever it is even, therefore halving the amount of work that remains.
+Louis is undoing this by doubling the number of steps by his double invocation of the recursive procedure.
+
+The original is logarithmic because we divide the exponent by two whenever the exponent is even.
+
+Louis's version is linear because we double the amount of work we have to do whenever the exponent is even, therfore cancelling out any
+step savings that halving the exponent does. Because each recursive call back to expmod will create two more recursive calls due to the
+applicative order evaluation.
+
+For example:
+
+# Louis's Linear Version:
+
+average time to find 1 primes greater than 5: >(expmod-linear 5 6 6)
+> (expmod-linear 5 3 6)
+> >(expmod-linear 5 2 6)
+> > (expmod-linear 5 1 6)
+> > >(expmod-linear 5 0 6)
+< < <1
+< < 5
+> > (expmod-linear 5 1 6)
+> > >(expmod-linear 5 0 6)
+< < <1
+< < 5
+< <1
+< 5
+> (expmod-linear 5 3 6)
+> >(expmod-linear 5 2 6)
+> > (expmod-linear 5 1 6)
+> > >(expmod-linear 5 0 6)
+< < <1
+< < 5
+> > (expmod-linear 5 1 6)
+> > >(expmod-linear 5 0 6)
+< < <1
+< < 5
+< <1
+< 5
+<1
+>(expmod-linear 5 7 7)
+> (expmod-linear 5 6 7)
+> >(expmod-linear 5 3 7)
+> > (expmod-linear 5 2 7)
+> > >(expmod-linear 5 1 7)
+> > > (expmod-linear 5 0 7)
+< < < 1
+< < <5
+> > >(expmod-linear 5 1 7)
+> > > (expmod-linear 5 0 7)
+< < < 1
+< < <5
+< < 4
+< <6
+> >(expmod-linear 5 3 7)
+> > (expmod-linear 5 2 7)
+> > >(expmod-linear 5 1 7)
+> > > (expmod-linear 5 0 7)
+< < < 1
+< < <5
+> > >(expmod-linear 5 1 7)
+> > > (expmod-linear 5 0 7)
+< < < 1
+< < <5
+< < 4
+< <6
+< 1
+<5
+(7)
+
+
+# Original Logarithmic Version:
+
+average time to find 1 primes greater than 5: >(expmod-log 5 6 6)
+> (expmod-log 5 3 6)
+> >(expmod-log 5 2 6)
+> > (expmod-log 5 1 6)
+> > >(expmod-log 5 0 6)
+< < <1
+< < 5
+< <1
+< 5
+<1
+>(expmod-log 5 7 7)
+> (expmod-log 5 6 7)
+> >(expmod-log 5 3 7)
+> > (expmod-log 5 2 7)
+> > >(expmod-log 5 1 7)
+> > > (expmod-log 5 0 7)
+< < < 1
+< < <5
+< < 4
+< <6
+< 1
+<5
+(7)
