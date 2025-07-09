@@ -1,7 +1,7 @@
 ;; Utilize 'cont-fract-iter' to approximate tangent in radians.
 
 (define (main)
-  (tan-cf 5.0 10))
+  (tan-cf 5 10))
 
 (define (tan-cf x k)
   (define (n-tangent i)
@@ -10,7 +10,7 @@
         ;; NOTE: Reversing the sign here to not modify the my original 'cont-fract-iter' procedure.
 	;; This is because the tangent continued fraction requires (n-tangent - d-tangent).
 	;; So we are doing (d-tangent + -n-tangent).
-       (- (* x x))))
+       (* x x -1.0)))
   (define (d-tangent i)
     (+ i (- i 1)))
   (cont-fract-iter n-tangent d-tangent k))
