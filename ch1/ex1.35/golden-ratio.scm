@@ -14,12 +14,23 @@
 ;; Use this fact to compute the golden ration by means of teh 'fixed-point' procedure:
 
 (define (main)
-  (golden-ratio))
+  (cube-root 27))
 
 (define (golden-ratio)
   (display (fixed-point (lambda (x) (+ 1 (/ 1 x))) 1.0))
   (newline))
 
+(define (sqrt x)
+  (fixed-point (average-damp (lambda (guess) (/ x guess))) 1.0))
+
+(define (cube-root x)
+  (fixed-point (average-damp (lambda (guess) (/ x (square guess)))) 1.0))
+
+(define (average-damp f)
+  (lambda (x) (average x (f x))))
+
+(define (average x y)
+  (/ (+ x y) 2))
 
 (define (fixed-point f first-guess)
     (define tolerance 0.00001)
@@ -31,3 +42,5 @@
 	    next
 	    (try next))))
     (try first-guess))
+
+(define (square x) (* x x))
