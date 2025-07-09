@@ -8,13 +8,9 @@
 	           10)))
 
 (define (d i)
-  (cond ((< i 2) 1)
-	((= i 2) 2)
-	(else
-	  (if (= (d (- i 3)) 1)
-	      1
-              (+ (d (- i 3)) (d (- i 2)) (d (- i 1))))
-	  )))
+  (cond ((= i 0) 2)
+	((= (remainder (+ i 1) 3) 0) (* (/ (+ i 1) 3) 2))
+	(else 1)))
 
 ;; In an iterative process, we don't have any delayed operations.
 ;; So to build an iterative process for a k-term finite continued fraction, we have to start
