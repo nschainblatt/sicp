@@ -13,8 +13,8 @@
   (lambda (x) (f (g x))))
 
 (define (smooth f)
-  (define dx 0.00001)
-  (lambda (x) (average (f (- x dx)) (f x) (f (+ x dx)))))
+  (let ((dx 0.00001))
+    (lambda (x) (average (f (- x dx)) (f x) (f (+ x dx))))))
 
 (define (average x y z) 
   (/ (+ x y z) 3))
