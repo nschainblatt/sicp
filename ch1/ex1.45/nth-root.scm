@@ -30,11 +30,15 @@
     (error "nth-root only accepts positive values of n.")
     (cond ((= n 1) x)
           (else
-            (define (recur i)
-                (if (>= i n)
-                  (average-damp (lambda (guess) (/ x (fast-expt guess (- n 1)))))
-                  (average-damp (recur (* i 2)))))
-            (fixed-point (recur 2) 1.0)))))
+            (fixed-point ((repeated average-damp (floor (log n 2))) (lambda (guess) (/ x (fast-expt guess (- n 1))))) 1.0)))))
+
+(define (repeated f n)
+  (lambda (x)
+    (define (recur i)
+      (if (= i 1)
+	f
+	(compose f (recur (- i 1)))))
+    ((recur n) x)))
 
 (define (>= x y)
   (or (> x y) (= x y)))
