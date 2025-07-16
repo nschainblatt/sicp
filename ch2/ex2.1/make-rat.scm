@@ -49,12 +49,9 @@
   (newline))
 
 (define (make-rat n d)
-  (let ((g (gcd n d)))
-    (let ((n (/ n g))
-	  (d (/ d g)))
-      (cond ((= d 0) (error "divide by zero"))
-	    ((xor (is-neg n) (is-neg d)) (cons (- (abs n)) (abs d)))
-	    (else (cons (abs n) (abs d)))))))
+  (let ((g (gcd n d))
+	(sign (if (< d 0) -1 1)))
+    (cons (* (/ n g) sign) (* (/ d g) sign))))
 
 (define (xor x y)
   (not (= x y)))
