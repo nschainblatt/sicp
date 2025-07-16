@@ -6,28 +6,28 @@
 
 ;; Positive numerator and denominator produce a positive rational number.
 (define (test1)
-  (let ((rat (make-rat 1 1)))
+  (let ((rat (make-rat 4 8)))
 	(assert-equals 1 (numer rat))
-	(assert-equals 1 (denom rat)))
+	(assert-equals 2 (denom rat)))
   (display ""))
 
 ;; Negative numerator and positive denominator produce a negative rational number.
 (define (test2)
-  (let ((rat (make-rat -1 1)))
+  (let ((rat (make-rat -3 24)))
 	(assert-equals -1 (numer rat))
-	(assert-equals 1 (denom rat)))
+	(assert-equals 8 (denom rat)))
   (display ""))
 
 ;; Positive numerator and negative denominator produce a negative rational number.
 (define (test3)
-  (let ((rat (make-rat 1 -1)))
+  (let ((rat (make-rat 4 -16)))
 	(assert-equals -1 (numer rat))
-	(assert-equals 1 (denom rat)))
+	(assert-equals 4 (denom rat)))
   (display ""))
 
 ;; Negative numerator and denominator produce a positive rational number.
 (define (test4)
-  (let ((rat (make-rat -1 -1)))
+  (let ((rat (make-rat -10 -10)))
 	(assert-equals 1 (numer rat))
 	(assert-equals 1 (denom rat)))
   (display ""))
@@ -49,9 +49,12 @@
   (newline))
 
 (define (make-rat n d)
-  (cond ((= d 0) (error "divide by zero"))
-	((xor (is-neg n) (is-neg d)) (cons (- (abs n)) (abs d)))
-	(else (cons (abs n) (abs d)))))
+  (let ((g (gcd n d)))
+    (let ((n (/ n g))
+	  (d (/ d g)))
+      (cond ((= d 0) (error "divide by zero"))
+	    ((xor (is-neg n) (is-neg d)) (cons (- (abs n)) (abs d)))
+	    (else (cons (abs n) (abs d)))))))
 
 (define (xor x y)
   (not (= x y)))
