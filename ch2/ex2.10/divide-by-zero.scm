@@ -1,6 +1,6 @@
 (define (main)
   (let ((interval-x (make-interval 6.12 7.48))
-        (interval-y (make-interval 6.12 0)))
+        (interval-y (make-interval -6.12 7.48)))
     (display (div-interval interval-x interval-y))
     (newline)))
 
@@ -14,10 +14,19 @@
   (cdr interval))
 
 (define (div-interval x y)
-  (if (or (= (upper-bound y) 0) (= (lower-bound y) 0)) (error "Error: divide by zero")
+  (if (spans-zero? y) (error "Error: cannot divide by an interval that spans zero.")
     (mul-interval x
                   (make-interval (/ 1.0 (lower-bound y))
                                  (/ 1.0 (upper-bound y))))))
+
+(define (spans-zero? x)
+  (and (<= (lower-bound x) 0) (>= (upper-bound x) 0)))
+
+(define (<= x y)
+  (or (< x y) (= x y)))
+
+(define (>= x y)
+  (or (> x y) (= x y)))
 
 (define (mul-interval x y)
   (let ((p1 (* (lower-bound x) (lower-bound y)))
