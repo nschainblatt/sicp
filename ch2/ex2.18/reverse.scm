@@ -1,0 +1,10 @@
+(define (main)
+  (reverse (list 1 2 3 4 5)))
+
+(define (reverse l)
+  (let ((rl (cons (car l) nil)))
+    (define (rev sub-l)
+      (if (null? (cdr sub-1))
+	(cons (car l) rl)
+	(cons (rev (cdr sub-1)) rl)))
+    (rev (cdr l))))
