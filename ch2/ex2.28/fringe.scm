@@ -17,13 +17,8 @@
   ;; either values (leafs) or empty lists, we have to convert any leaves to lists in order for append to work correctly.
   (define (get-all-leaves node)
     (cond ((null? node) '())
-          ((list? node)
-           (append (get-as-list (get-all-leaves (car node))) (get-as-list (get-all-leaves (cdr node)))))
-          (else node)))
+          ((list? node) (append (get-all-leaves (car node))
+                                (get-all-leaves (cdr node))))
+          (else (list node))))
 
   (get-all-leaves tree))
-
-
-(define (get-as-list x)
-  (if (list? x) x
-    (list x)))
