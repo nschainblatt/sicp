@@ -4,8 +4,11 @@
         (vector (list 1 2 3 4)))
     (matrix-*-matrix matrix-1 matrix-2)))
 
+(define (dot-product v1 v2)
+  (accumulate + 0 (map * v1 v2)))
+
 (define (matrix-*-vector m v)
-  (map (lambda (row) (accumulate + 0 (accumulate-n * 1 (list row v)))) m))
+  (map (lambda (row) (dot-product row v)) m))
 
 (define (transpose m)
   (accumulate-n cons '() m))
@@ -13,8 +16,7 @@
 (define (matrix-*-matrix m1 m2)
   (let ((cols (transpose m2)))
     (map (lambda (m1-row)
-           (map (lambda (m2-row) (accumulate + 0 (accumulate-n * 1 (list m1-row m2-row))))
-                cols))
+           (matrix-*-vector cols m1-row))
          m1)))
 
 (define (accumulate-n op init seqs)
