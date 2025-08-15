@@ -37,10 +37,8 @@
         (else #t)))
 
 (define (is-checked? k positions)
-  (let ((row-of-k-queen (find-row-of-queen-in-column-k k positions)))
-    (or (has-queen-in-same-row? k positions row-of-k-queen)
-        (has-queen-in-same-col? k positions row-of-k-queen)
-        (has-queen-in-diagonal? k positions row-of-k-queen))))
+  (let ((new-queen-row (find-row-of-queen-in-column-k k positions)))
+    (has-queen-in-same-row-or-diagonal? positions new-queen-row k)))
 
 ;; Returns the row number where the new queen is positioned in column k.
 ;; This is determined by iterating through each row, iterating to column k within
@@ -62,50 +60,33 @@
 
   (row-iter 1 positions))
 
-;; Returns true if a queen is found in the same row as the new queen on column k.
-;; This is determined by iterating through the board to find the correct row,
-;; then iterating through the columns of that row until k, if a queen is found
-;; before reaching column k, then we return true. If k is reached and no queen has been found,
-;; then we return false because k is the latest modified column. No columns past k have any queens yet.
-(define (has-queen-in-same-row? k positions row-of-k-queen)
+;; Returns true if a queen is found in the same row as the new queen in column k or there is a queen diagonal to the new queen
+;; in column k.
+;; This is determined by iterating over every row in the current boards positions, if the row is the same row as the queen in column k,
+;; then we iterate through the columns of that row checking for other queens. During the same row iteration, we check each rows
+;; columns that are diagonal to the new queen in column k to see if they contain queens as well.
+;; We return as soon as a queen is found that would check the new queen in column k.
+(define (has-queen-in-same-row-or-diagonal? positions new-queen-row new-queen-col)
 
-  (define (col-iter index sub-row)
-    (cond ((null? sub-row) (error "out of bounds, we should've returned early or found a queen by now"))
-          ((= index k) #f) ;; Reached k, safe
-          ((= (car (car sub-row)) 1) #t) ;; Found a queen before k, not safe
-          (else (col-iter (+ index 1) (cdr sub-row)))))
-
-  ;; Finds the row of row-of-k-queen, then calls col-iter to find a queen if any.
-  (define (row-iter index sub-pos)
-    (cond ((null? sub-pos) (error "didn't find correct row"))
-          ((= index row-of-k-queen) (col-iter 1 (car sub-pos)))
-          (else (row-iter (+ index 1) (cdr sub-pos)))))
-
-  (row-iter 1 positions))
-
-(define (has-queen-in-same-col? k positions row-of-k-queen)
-  ;;NOTE: returning false always, since we are adding a new queen to column k, there will already be no other queens in that column
-  #f)
-
-;; Returns true if there is a queen diagonal to the new queen in column k.
-;; This is determined by iterating through each row in the board, and for each
-;; column in each row, we check if the column is diagonal to the position of the queen
-;; in column k, and then we check if it has a queen in it.
-(define (has-queen-in-diagonal? k positions row-of-k-queen)
-  ;; Go through each row in the board
   (define (row-iter row-index sub-pos)
-    ;; Go through each column in the row
-    ;; Check if the current cell is diagonal to the new position of the queen to place
-    ;; Return early if a queen is found, or we've reached k in the current row (can skip if the case)
-    (define (col-iter col-index sub-row)
+
+    (define (same-row-col-iter col-index sub-row)
       (cond ((null? sub-row) (error "out of bounds, we should've returned early or found a queen by now"))
-            ((= col-index k) #f) ;; Reached k, safe
-            ((and (is-diagonal? row-of-k-queen k row-index col-index) (= (car (car sub-row)) 1)) #t)
-            (else (col-iter (+ col-index 1) (cdr sub-row)))))
+            ((= col-index new-queen-col) #f) ;; Reached new-queen-col, safe
+            ((= (car (car sub-row)) 1) #t) ;; Found a queen before new-queen-col, not safe
+            (else (same-row-col-iter (+ col-index 1) (cdr sub-row)))))
+
+    (define (diag-col-iter col-index sub-row)
+      (cond ((null? sub-row) (error "out of bounds, we should've returned early or found a queen by now"))
+            ((= col-index new-queen-col) #f) ;; Reached new-queen-col, safe
+            ((and (is-diagonal? new-queen-row new-queen-col row-index col-index) (= (car (car sub-row)) 1)) #t)
+            (else (diag-col-iter (+ col-index 1) (cdr sub-row)))))
 
     (cond ((null? sub-pos) #f)
-          ((= row-index row-of-k-queen) (row-iter (+ row-index 1) (cdr sub-pos))) ;; Continue, no need to check same row
-          ((col-iter 1 (car sub-pos)) #t)
+          ((= row-index new-queen-row) (if (same-row-col-iter 1 (car sub-pos))
+                                         #t
+                                         (row-iter (+ row-index 1) (cdr sub-pos))))
+          ((diag-col-iter 1 (car sub-pos)) #t)
           (else (row-iter (+ row-index 1) (cdr sub-pos)))))
 
   (row-iter 1 positions))
