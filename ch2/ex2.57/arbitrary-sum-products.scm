@@ -27,22 +27,14 @@
 (define (addend s) (cadr s))
 
 (define (augend s)
-  (define (iter sequence sum)
-    (if (null? sequence)
-      sum
-      (iter (cdr sequence) (make-sum sum (car sequence)))))
-  (iter (cddr s) 0))
+  (accumulate make-sum 0 (cddr s)))
 
 (define (product? x) (and (pair? x) (eq? (car x) '*)))
 
 (define (multiplier p) (cadr p))
 
 (define (multiplicand p)
-  (define (iter sequence product)
-    (if (null? sequence)
-      product
-      (iter (cdr sequence) (make-product product (car sequence)))))
-  (iter (cddr p) 1))
+  (accumulate make-product 1 (cddr p)))
 
 (define (make-sum a1 a2)
   (cond ((=number? a1 0) a2)
@@ -73,3 +65,8 @@
   (cond ((= exponent 0) 1)
         ((= exponent 1) base)
         (else (list '** base exponent))))
+
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+    initial
+    (op (car sequence) (accumulate op initial (cdr sequence)))))
