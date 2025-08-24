@@ -18,3 +18,11 @@
           ((element-of-set? (car sub-set2) set1) (recur (cdr sub-set2)))
           (else (cons (car sub-set2) (recur (cdr sub-set2))))))
   (append set1 (recur set2)))
+
+(define (union-set set1 set2)
+  (accumulate adjoin-set set1 set2))
+
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+    initial
+    (op (car sequence) (accumulate op initial (cdr sequence)))))
