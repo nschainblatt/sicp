@@ -31,10 +31,9 @@
 ;; contain duplicates.
 ;; This solution is linear.
 (define (union-set set1 set2)
-  (define (iter sub-set-1 sub-set-2 new-set)
-    (cond ((or (null? sub-set-1) (null? sub-set-2)) (append new-set sub-set-1 sub-set-2))
-          ((> (car sub-set-1) (car sub-set-2)) (iter sub-set-1 (cdr sub-set-2) (append new-set (list (car sub-set-2)))))
-          ((< (car sub-set-1) (car sub-set-2)) (iter (cdr sub-set-1) sub-set-2 (append new-set (list (car sub-set-1)))))
+    (cond ((null? set1) set2)
+          ((null? set2) set1)
+          ((> (car set1) (car set2)) (cons (car set2) (union-set set1 (cdr set2))))
+          ((< (car set1) (car set2)) (cons (car set1) (union-set (cdr set1) set2)))
           ;; If equal, add one of them to the end of the new set
-          (else (iter (cdr sub-set-1) (cdr sub-set-2) (append new-set (list (car sub-set-1)))))))
-  (iter set1 set2 '()))
+          (else (cons (car set1) (union-set (cdr set1) (cdr set2))))))
