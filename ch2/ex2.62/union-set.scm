@@ -1,7 +1,7 @@
 (define (main)
   (let ((set1 '(-100 0 2 3 6 7 8 9 10 100))
         (set2 '(-100 -2 -1 0 1 3 4 5 11 100)))
-    (println (union-set set1 set2)))) ;; 1 2 3 4 5 6 7 8 9 10
+    (println (union-set set1 set2)))) ;; -100 -2 -1 0 1 2 3 4 5 6 7 8 9 10 11 100
 
 (define (println x)
   (display x)
