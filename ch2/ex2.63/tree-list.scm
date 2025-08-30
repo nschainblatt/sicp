@@ -2,11 +2,11 @@
 ;; tree->list-1 is a recursive process that builds the result list from left branch to right branch keeping order.
 ;; tree->list-2 is a recursive process that builds the result list from left branch to right branch keeping order.
 ;;
-;; b. The order of growth is larger for tree->list-2 than for tree->list-1. This is because in each step of tree->list-2 append is used to build
+;; b. The order of growth is larger for tree->list-1 than for tree->list-2. This is because in each step of tree->list-1 append is used to build
 ;; the results list and append has linear order of growth. Append is used at each node of the tree, and since at each node of the tree the 
 ;; remaining nodes are halved (on average), the order of growth with this append is O(logn), however, since every node is traversed while
 ;; building this list, the order of growth is O(n*logn).
-;; While tree->list-1 uses cons instead of append, which is a constant time operation, the order of grown is O(n), which is based on just
+;; While tree->list-2 uses cons instead of append, which is a constant time operation, the order of grown is O(n), which is based on just
 ;; the regular traversal visiting each node of the tree.
 
 (define (main)
