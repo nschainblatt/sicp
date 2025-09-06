@@ -2,34 +2,62 @@
 ;; Each filetype will have their own specific selectors that will use the same names, but stored inside a operation-and-type table to
 ;; store procedures organized by file type. Each file type will have an installation package to add their specific selectors and other
 ;; procedures to the table.
-;;
+
 ;; For example:
-;; |-----------------------|------------------------Types----------------------------------------|
+;; |-----------------------|--------------------------------Types--------------------------------|
 ;; | Operations            | division-1                       | division-2                       |
 ;; |-----------------------|----------------------------------|----------------------------------|
-;; | get-record            | get-record-division-1            | get-record-division-2            |
-;; | get-salary            | get-salary-division-1            | get-salary-division-2            |
-;; | find-employee-record  | find-employee-division-1         | find-employee-division-2         |
-;; | make-personnel-record | make-personnel-record-division-1 | make-personnel-record-division-2 |
+;; | get-record            | get-record                       | get-record                       |
+;; | get-salary            | get-salary                       | get-salary                       |
+;; | find-employee-record  | find-employee-record             | find-employee-record             |
+;; | make-personnel-record | make-personnel-record            | make-personnel-record            |
 ;; |-----------------------|----------------------------------|----------------------------------|
 
-;; ---
-
 (define (main)
-  (put 'op-1 'type-1 cons)
-  (put 'op-1 'type-1 car)
-  (put 'op-2 'type-1 car)
-  (put 'op-2 'type-1 cdr)
-  (put 'op-1 'type-2 cddr)
-  (put 'op-1 'type-1 display)
-  (put 'test-op 'test-1 display)
-  (put 'test-op 'test-1 display)
-  (put 'test-op2 'test-1 display)
-  (put 'test-op2 'test-1 display)
-  ((get 'op-1 'type-1) "asdf\n"))
+  ;; Install packages to use their stored procedures with the table.
+  (install-division-1-file-package)
+  (install-division-2-file-package)
+
+  (println "--- DIVISION 1 ---")
+  (let* ((address-1 ((get 'make-address 'division-1) "123 abc street" "nyc" "ny" "1234"))
+         (salary-1 ((get 'make-salary 'division-1) "salary" "10000000000"))
+         (record-1 ((get 'make-personnel-record 'division-1) "nate" address-1 salary-1))
+         (address-2 ((get 'make-address 'division-1) "456 def main" "la" "ca" "5678"))
+         (salary-2 ((get 'make-salary 'division-1) "hourly" "100"))
+         (record-2 ((get 'make-personnel-record 'division-1) "john" address-2 salary-2))
+         (records (list record-1 record-2))
+         (division-1-file ((get 'make-file 'division-1) records)))
+    (println ((get 'get-address 'division-1) ((get 'get-record 'division-1) "nate" division-1-file)))
+    (println ((get 'get-salary 'division-1) ((get 'get-record 'division-1) "nate" division-1-file)))
+    (println ((get 'get-address 'division-1) ((get 'get-record 'division-1) "john" division-1-file)))
+    (println ((get 'get-salary 'division-1) ((get 'get-record 'division-1) "john" division-1-file)))
+
+    (newline)
+
+    (println "--- DIVISION 2 ---")
+    (let* ((address-1 ((get 'make-address 'division-2) "123 abc street" "nyc" "ny" "1020"))
+           (salary-1 ((get 'make-salary 'division-2) "salary" "9999"))
+           (record-1 ((get 'make-personnel-record 'division-2) "west" address-1 salary-1))
+           (address-2 ((get 'make-address 'division-2) "456 def main" "la" "ca" "3020"))
+           (salary-2 ((get 'make-salary 'division-2) "hourly" "999"))
+           (record-2 ((get 'make-personnel-record 'division-2) "smith" address-2 salary-2))
+           (records (list record-1 record-2))
+           (division-2-file ((get 'make-file 'division-2) records)))
+      (println ((get 'get-address 'division-2) ((get 'get-record 'division-2) "west" division-2-file)))
+      (println ((get 'get-salary 'division-2) ((get 'get-record 'division-2) "west" division-2-file)))
+      (println ((get 'get-address 'division-2) ((get 'get-record 'division-2) "smith" division-2-file)))
+      (println ((get 'get-salary 'division-2) ((get 'get-record 'division-2) "smith" division-2-file)))
+
+      (newline)
+
+      (println (find-employee-record "smith" (list division-1-file division-2-file))))))
 
 ;; Finds
-;; ---
+
+(define (find-by-tag tag sequence)
+  (cond ((null? sequence) #f)
+        ((eq? tag (caar sequence)) (cdar sequence))
+        (else (find-by-tag tag (cdr sequence)))))
 
 (define (find-procedure-for-operations operation ops)
   (cond ((null? ops) (error "operation not found in operations" operation ops))
@@ -41,11 +69,9 @@
         ((eq? type (caar table)) (cadar table))
         (else (find-operations-for-type type (cdr table) (if (null? default-value) '() (car default-value))))))
 
-
 ;; Operations Table
-;; ---
 
-;; NOTE: Will hold like this: ((type ((operation procedure) (operation procedure) ...)) (type ...))
+;; NOTE: Structure: ((type ((operation procedure) (operation procedure) ...)) (type ...))
 (define operation-type-table '())
 
 (define (get operation type)
@@ -71,20 +97,20 @@
 ;; ---
 
 (define (install-division-2-file-package)
-  (define (make-division-2-file records)
+  (define (make-file records)
     (cons 'division-2 records))
-  (define (make-personnel-record address salary)
-    (cons 'personnel-record (cons address salary)))
+  (define (make-personnel-record name address salary)
+    (cons name (cons address salary)))
   (define (make-address street city state zip)
     (list 'address street city state zip))
   (define (make-salary type amount)
     (list 'salary type amount))
   (define (get-record name f)
-    (find name (cdr f)))
-  (define get-address cadr)
+    (find-by-tag name (cdr f)))
+  (define get-address cdar)
   (define get-salary cddr)
 
-  (put 'make-division-2-file 'division-2 make-division-2-file)
+  (put 'make-file 'division-2 make-file)
   (put 'make-personnel-record 'division-2 make-personnel-record)
   (put 'make-address 'division-2 make-address)
   (put 'make-salary 'division-2 make-salary)
@@ -95,20 +121,20 @@
 ;; ---
 
 (define (install-division-1-file-package)
-  (define (make-division-1-file records)
+  (define (make-file records)
     (list 'division-1 records))
-  (define (make-personnel-record address salary)
-    (list 'personnel-record address salary))
+  (define (make-personnel-record name address salary)
+    (list name address salary))
   (define (make-address street city state zip)
     (list 'address street city state zip))
   (define (make-salary type amount)
     (list 'salary type amount))
   (define (get-record name f)
-    (find name (cadr f)))
-  (define get-address cadr)
-  (define get-salary caddr)
+    (find-by-tag name (cadr f)))
+  (define get-address cdar)
+  (define get-salary cdadr)
 
-  (put 'make-division-1-file 'division-1 make-division-1-file)
+  (put 'make-file 'division-1 make-file)
   (put 'make-personnel-record 'division-1 make-personnel-record)
   (put 'make-address 'division-1 make-address)
   (put 'make-salary 'division-1 make-salary)
@@ -116,47 +142,33 @@
   (put 'get-address 'division-1 get-address)
   (put 'get-salary 'division-1 get-salary))
 
-
-;; NOTE: this procedure searches across all divisions, so not apart of an individual package
-;; This is why it is important for all divisions to have their type information as the first element, otherwise we wouldn't know what
-;; type, and a type getter wouldn't work because we still wouldn't know which type getter to use for the file.
-(define (find-employee-record name files)
-  (cond ((null? files) #f)
-        (((let* ((f (car files)) ;; if we found the record, return it
-                 (type (car f)))
-            ((get 'get-record type) name f))) ((get 'get-record type) name f))
-        (else (find-employee-record name (cdr files)))))
+;; ---
 
 ;; A. The different filetypes must have the following type/tag information as the first element of their lists or pairs:
-;;    - File: (personnel_record_file ...)
-;;    - Personnel Records: the employee name e.g. (john ...)
-;;    - Address: (address ...)
-;;    - Salary: (salary ...)
+;;    - File: e.g. ('division-1-file ...)
+;;    Using get-record implementation for devision-1:
+;;    -  ((get 'get-record 'division-1) division-1-file)
 
-;; TODO: move the two file structures from paper to the code.
-;; TODO: create an installation package with the following:
-;;       - the required procedures
-;;       - constructors to construct representations to test with
-;; TODO: test.
-;; TODO: reread the problem requirements to make sure you checked every box.
-
-;; Using get-record implementation for devision-1
-;; ((get 'get-record 'division-1) division-1-personnel-file)
-
-;; B. To get a salary from any personnel file, the division file type will need to be known. Then all you would have to do would be
+;; B. The actual structure of the salary record may vary, as long as the divisions selectors meet the requirements of returning the correct data.
+;;    To get a salary from any personnel file, the division file type will need to be known. Then all you would have to do would be
 ;;    to request the correct procedure by type (assuming the package was installed) and then you would only have to pass the file to
-;;    the procedure:
-;; ((get 'get-salary 'division-2) division-2-personnel-file)
+;;    the procedure to get the salary:
+;;      - ((get 'get-salary 'division-2) division-2-personnel-file)
 
-
-;; C.
-;; ((get 'find-employee-record 'division-1) division-1-files)
+;; C. This procedure searches across all divisions, so not apart of an individual package
+;;    This is why it is important for all divisions to have their type information as the first element, otherwise we wouldn't know what
+;;    type, and a type getter wouldn't work because we still wouldn't know which type getter to use for the file.
+(define (find-employee-record name files)
+  (if (null? files)
+    (error "employee not found in files" name)
+    (let* ((f (car files))
+           (type (car f))
+           (record ((get 'get-record type) name f)))
+      (if record
+        record
+        (find-employee-record name (cdr files))))))
 
 ;; D. During a company takeover, Insatiable would have to audit their file structure and maybe make modifications to ensure the following:
-;;    1. Company specific selectors would have to be created within the new package to select the type of each entity.
-;;       This is because the type names may be different even if they have the same meaning, the type infomration could also be stored
-;;       in a different location. So procedures for selecting and then converting to the correct type to then provide to the operation-and-type
-;;       table would have to be created.
-;;    2. The required employee data such as salary and address are required.
-;;    3. Regular selectors and constructors will need to be created and installed via a new package (for get-record, get-salary, etc)
-
+;;    1. A new installation package would need to be made with required constructors and selectors supporting all data fields (address, salary, etc).
+;;    2. The location of the types in the structure will have to be the same for the 'find-employee-record' to work properly across all files still.
+;;    These are all required to ensure no changes are required to the existing divisions and code bases.
