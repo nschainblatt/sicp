@@ -84,12 +84,12 @@
 
 (define (find-operations-for-type type table . default-value)
   (cond ((null? table) (if (null? default-value) (error "operations not found for type" type) (car default-value)))
-        ((eq? type (get-tag (car table))) (cadar table))
+        ((eq? type (get-tag (car table))) (get-contents (car table)))
         (else (find-operations-for-type type (cdr table) (if (null? default-value) '() (car default-value))))))
 
 ;; Operations Table
 
-;; NOTE: Structure: ((type ((operation procedure) (operation procedure) ...)) (type ...))
+;; NOTE: Structure: ((type (operation procedure) (operation procedure) ...) (type ... ...))
 (define operation-type-table '())
 
 (define (get operation type)
@@ -109,7 +109,7 @@
             (else (cons (car sequence) (replace-or-append tag item (cdr sequence))))))
 
     (let ((new-operations (replace-or-append operation (cons operation procedure) operations)))
-      (let ((new-table (replace-or-append type (list type new-operations) operation-type-table)))
+      (let ((new-table (replace-or-append type (append (list type) new-operations) operation-type-table)))
         (set! operation-type-table new-table)))))
 
 ;; ---
