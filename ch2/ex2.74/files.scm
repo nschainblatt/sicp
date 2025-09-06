@@ -1,3 +1,7 @@
+;; TODO: make global selected for getting the type/tag, getting the content, etc
+;;       use apply-specific
+;;       maybe make global selectors that use apply-specific, but then require the file type to then apply the correct generic procedure.
+
 ;; Data-directed programming.
 ;; Each filetype will have their own specific selectors that will use the same names, but stored inside a operation-and-type table to
 ;; store procedures organized by file type. Each file type will have an installation package to add their specific selectors and other
@@ -52,21 +56,35 @@
 
       (println (find-employee-record "smith" (list division-1-file division-2-file))))))
 
+;; ---
+
+(define (get-tag x)
+  (if (not (pair? x))
+          (error "incorrect internal structure")
+          (car x)))
+
+(define (get-contents x)
+  (if (not (pair? x))
+          (error "incorrect internal structure")
+          (cdr x)))
+
+;; ---
+
 ;; Finds
 
 (define (find-by-tag tag sequence)
   (cond ((null? sequence) #f)
-        ((eq? tag (caar sequence)) (cdar sequence))
+        ((eq? tag (get-tag (car sequence))) (get-contents (car sequence)))
         (else (find-by-tag tag (cdr sequence)))))
 
 (define (find-procedure-for-operations operation ops)
   (cond ((null? ops) (error "operation not found in operations" operation ops))
-        ((eq? operation (caar ops)) (cdar ops))
+        ((eq? operation (get-tag (car ops))) (get-contents (car ops)))
         (else (find-procedure-for-operations operation (cdr ops)))))
 
 (define (find-operations-for-type type table . default-value)
   (cond ((null? table) (if (null? default-value) (error "operations not found for type" type) (car default-value)))
-        ((eq? type (caar table)) (cadar table))
+        ((eq? type (get-tag (car table))) (cadar table))
         (else (find-operations-for-type type (cdr table) (if (null? default-value) '() (car default-value))))))
 
 ;; Operations Table
