@@ -108,6 +108,9 @@
       (let ((new-table (replace-or-append type (append (list type) new-operations) operation-type-table)))
         (set! operation-type-table new-table)))))
 
+(define (apply-specific operation type . args)
+    (apply (get operation type) args))
+
 ;; ---
 
 (define (install-division-2-file-package)
