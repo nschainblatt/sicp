@@ -22,7 +22,6 @@
   (install-division-1-file-package)
   (install-division-2-file-package)
 
-  (println "--- DIVISION 1 ---")
   (let* ((address-1 ((get 'make-address 'division-1) "123 abc street" "nyc" "ny" "1234"))
          (salary-1 ((get 'make-salary 'division-1) "salary" "10000000000"))
          (record-1 ((get 'make-personnel-record 'division-1) "nate" address-1 salary-1))
@@ -31,14 +30,6 @@
          (record-2 ((get 'make-personnel-record 'division-1) "john" address-2 salary-2))
          (records (list record-1 record-2))
          (division-1-file ((get 'make-file 'division-1) records)))
-    (println ((get 'get-address 'division-1) ((get 'get-record 'division-1) "nate" division-1-file)))
-    (println ((get 'get-salary 'division-1) ((get 'get-record 'division-1) "nate" division-1-file)))
-    (println ((get 'get-address 'division-1) ((get 'get-record 'division-1) "john" division-1-file)))
-    (println ((get 'get-salary 'division-1) ((get 'get-record 'division-1) "john" division-1-file)))
-
-    (newline)
-
-    (println "--- DIVISION 2 ---")
     (let* ((address-1 ((get 'make-address 'division-2) "123 abc street" "nyc" "ny" "1020"))
            (salary-1 ((get 'make-salary 'division-2) "salary" "9999"))
            (record-1 ((get 'make-personnel-record 'division-2) "west" address-1 salary-1))
@@ -47,26 +38,31 @@
            (record-2 ((get 'make-personnel-record 'division-2) "smith" address-2 salary-2))
            (records (list record-1 record-2))
            (division-2-file ((get 'make-file 'division-2) records)))
+      (println "--- DIVISION 1 ---")
+      (println ((get 'get-address 'division-1) ((get 'get-record 'division-1) "nate" division-1-file)))
+      (println ((get 'get-salary 'division-1) ((get 'get-record 'division-1) "nate" division-1-file)))
+      (println ((get 'get-address 'division-1) ((get 'get-record 'division-1) "john" division-1-file)))
+      (println ((get 'get-salary 'division-1) ((get 'get-record 'division-1) "john" division-1-file)))
+      (newline)
+      (println "--- DIVISION 2 ---")
       (println ((get 'get-address 'division-2) ((get 'get-record 'division-2) "west" division-2-file)))
       (println ((get 'get-salary 'division-2) ((get 'get-record 'division-2) "west" division-2-file)))
       (println ((get 'get-address 'division-2) ((get 'get-record 'division-2) "smith" division-2-file)))
       (println ((get 'get-salary 'division-2) ((get 'get-record 'division-2) "smith" division-2-file)))
-
       (newline)
-
       (println (find-employee-record "smith" (list division-1-file division-2-file))))))
 
 ;; ---
 
 (define (get-tag x)
   (if (not (pair? x))
-          (error "incorrect internal structure")
-          (car x)))
+    (error "incorrect internal structure")
+    (car x)))
 
 (define (get-contents x)
   (if (not (pair? x))
-          (error "incorrect internal structure")
-          (cdr x)))
+    (error "incorrect internal structure")
+    (cdr x)))
 
 ;; ---
 
