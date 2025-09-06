@@ -1,6 +1,3 @@
-;; TODO: 
-;;       maybe make global selectors that use apply-specific, but then require the file type to then apply the correct generic procedure.
-
 ;; Data-directed programming.
 ;; Each filetype will have their own specific selectors that will use the same names, but stored inside a operation-and-type table to
 ;; store procedures organized by file type. Each file type will have an installation package to add their specific selectors and other
@@ -21,50 +18,67 @@
   (install-division-1-file-package)
   (install-division-2-file-package)
 
-  (let* ((address-1 (apply-specific 'make-address 'division-1 "123 abc street" "nyc" "ny" "1234"))
+  (let* ((address-1 (apply-specific 'make-address 'division-1 "123 nate street" "nyc" "ny" "1234"))
          (salary-1 (apply-specific 'make-salary 'division-1 "salary" "10000000000"))
          (record-1 (apply-specific 'make-personnel-record 'division-1 "nate" address-1 salary-1))
-         (address-2 (apply-specific 'make-address 'division-1 "456 def main" "la" "ca" "5678"))
+         (address-2 (apply-specific 'make-address 'division-1 "456 def john" "la" "ca" "5678"))
          (salary-2 (apply-specific 'make-salary 'division-1 "hourly" "100"))
          (record-2 (apply-specific 'make-personnel-record 'division-1 "john" address-2 salary-2))
          (records (list record-1 record-2))
          (division-1-file (apply-specific 'make-file 'division-1 records)))
-    (let* ((address-1 (apply-specific 'make-address 'division-2 "123 abc street" "nyc" "ny" "1020"))
+    (let* ((address-1 (apply-specific 'make-address 'division-2 "123 west street" "nyc" "ny" "1020"))
            (salary-1 (apply-specific 'make-salary 'division-2 "salary" "9999"))
            (record-1 (apply-specific 'make-personnel-record 'division-2 "west" address-1 salary-1))
-           (address-2 (apply-specific 'make-address 'division-2 "456 def main" "la" "ca" "3020"))
+           (address-2 (apply-specific 'make-address 'division-2 "456 def smith" "la" "ca" "3020"))
            (salary-2 (apply-specific 'make-salary 'division-2 "hourly" "999"))
            (record-2 (apply-specific 'make-personnel-record 'division-2 "smith" address-2 salary-2))
            (records (list record-1 record-2))
            (division-2-file (apply-specific 'make-file 'division-2 records)))
       (println "--- DIVISION 1 ---")
-      (println (apply-specific 'get-address 'division-1 (apply-specific 'get-record 'division-1 "nate" division-1-file)))
-      (println (apply-specific 'get-salary 'division-1 (apply-specific 'get-record 'division-1 "nate" division-1-file)))
-      (println (apply-specific 'get-address 'division-1 (apply-specific 'get-record 'division-1 "john" division-1-file)))
-      (println (apply-specific 'get-salary 'division-1 (apply-specific 'get-record 'division-1 "john" division-1-file)))
+      (println (get-record "nate" division-1-file))
+      (println (get-address (get-record "nate" division-1-file)))
+      (println (get-salary (get-record "nate" division-1-file)))
+      (println (get-address (get-record "john" division-1-file)))
+      (println (get-salary (get-record "john" division-1-file)))
       (newline)
       (println "--- DIVISION 2 ---")
-      (println (apply-specific 'get-address 'division-2 (apply-specific 'get-record 'division-2 "west" division-2-file)))
-      (println (apply-specific 'get-salary 'division-2 (apply-specific 'get-record 'division-2 "west" division-2-file)))
-      (println (apply-specific 'get-address 'division-2 (apply-specific 'get-record 'division-2 "smith" division-2-file)))
-      (println (apply-specific 'get-salary 'division-2 (apply-specific 'get-record 'division-2 "smith" division-2-file)))
+      (println (get-address (get-record "west" division-2-file)))
+      (println (get-salary (get-record "west" division-2-file)))
+      (println (get-address (get-record "smith" division-2-file)))
+      (println (get-salary (get-record "smith" division-2-file)))
       (newline)
       (println (find-employee-record "smith" (list division-1-file division-2-file))))))
 
+;; Generics
+
+(define (get-record name file)
+  (let ((record (apply-specific 'get-record (get-tag file) name file)))
+    (if record
+      (tag-item (get-tag file) record)
+      #f)))
+
+(define (get-salary record)
+  (apply-specific 'get-salary (get-tag record) record))
+
+(define (get-address record)
+  (apply-specific 'get-address (get-tag record) record))
 
 ;; ---
 
+(define (tag-item tag item)
+  (if (not (pair? item))
+    (error "incorrect internal structure --- TAG-ITEM")
+    (cons tag item)))
+
 (define (get-tag x)
   (if (not (pair? x))
-    (error "incorrect internal structure")
+    (error "incorrect internal structure --- GET-TAG")
     (car x)))
 
 (define (get-contents x)
   (if (not (pair? x))
     (error "incorrect internal structure")
     (cdr x)))
-
-;; ---
 
 ;; Finds
 
@@ -109,7 +123,7 @@
         (set! operation-type-table new-table)))))
 
 (define (apply-specific operation type . args)
-    (apply (get operation type) args))
+  (apply (get operation type) args))
 
 ;; ---
 
@@ -124,7 +138,7 @@
     (list 'salary type amount))
   (define (get-record name f)
     (find-by-tag name (cdr f)))
-  (define get-address cdar)
+  (define get-address cadr)
   (define get-salary cddr)
 
   (put 'make-file 'division-2 make-file)
@@ -148,8 +162,8 @@
     (list 'salary type amount))
   (define (get-record name f)
     (find-by-tag name (cadr f)))
-  (define get-address cdar)
-  (define get-salary cdadr)
+  (define get-address cadr)
+  (define get-salary caddr)
 
   (put 'make-file 'division-1 make-file)
   (put 'make-personnel-record 'division-1 make-personnel-record)
@@ -163,14 +177,15 @@
 
 ;; A. The different filetypes must have the following type/tag information as the first element of their lists or pairs:
 ;;    - File: e.g. ('division-1-file ...)
-;;    Using get-record implementation for devision-1:
-;;    -  (apply-specific 'get-record 'division-1 division-1-file)
+;;    Using generic get-record above:
+;;    -  (get-record division-1-file)
 
 ;; B. The actual structure of the salary record may vary, as long as the divisions selectors meet the requirements of returning the correct data.
 ;;    To get a salary from any personnel file, the division file type will need to be known. Then all you would have to do would be
 ;;    to request the correct procedure by type (assuming the package was installed) and then you would only have to pass the file to
-;;    the procedure to get the salary:
-;;      - (apply-specific 'get-salary 'division-2 division-2-personnel-file)
+;;    the procedure to get the salary. Using the generic function, you simply have to pass the record that was fetched with the get-record generic to
+;;    do so without you having to worry about the type information, leaving it to the internal workings of the procedures to do so.
+;;      - (get-salary record)
 
 ;; C. This procedure searches across all divisions, so not apart of an individual package
 ;;    This is why it is important for all divisions to have their type information as the first element, otherwise we wouldn't know what
@@ -180,12 +195,12 @@
     (error "employee not found in files" name)
     (let* ((f (car files))
            (type (car f))
-           (record (apply-specific 'get-record type name f)))
+           (record (get-record name f)))
       (if record
         record
         (find-employee-record name (cdr files))))))
 
-;; D. During a company takeover, Insatiable would have to audit their file structure and maybe make modifications to ensure the following:
+;; D. During a company takeover, Insatiable would have to audit their file structure and make modifications to ensure the following:
 ;;    1. A new installation package would need to be made with required constructors and selectors supporting all data fields (address, salary, etc).
 ;;    2. The location of the types in the structure will have to be the same for the 'find-employee-record' to work properly across all files still.
 ;;    These are all required to ensure no changes are required to the existing divisions and code bases.
