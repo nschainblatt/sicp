@@ -101,7 +101,7 @@
     ;; Search the operations to see if 'operation' already exists or isn't present, replacing or appending and returning the new operations
     (define (replace-or-append tag item sequence)
       (cond ((null? sequence)  (cons item '())) ;; append to end if not found
-            ((eq? tag (caar sequence))  (cons item (cdr sequence)))
+            ((eq? tag (get-tag (car sequence)))  (cons item (cdr sequence)))
             (else (cons (car sequence) (replace-or-append tag item (cdr sequence))))))
 
     (let ((new-operations (replace-or-append operation (cons operation procedure) operations)))
