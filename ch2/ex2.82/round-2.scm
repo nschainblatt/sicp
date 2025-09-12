@@ -3,10 +3,12 @@
 ;; leading to another call to apply-generic with the two arguments of type t2, then, because we don't have identity coercions added in the table
 ;; the procedure will end with an error because no proc or coercion procs were found.
 
-;; My attempted 'generalized' apply-generic procedure is also not sufficiently general because of the same reason, the first match of a coercion
-;; that works against all arguments will be selected (first condition in cond) and will be supplied to the following call to apply-generic.
-;; Then if there is no proc found for this subsequent call, an error will be thrown as no more coercions can be tried (all arguments have the
-;; same value) and no proc was found.
+;; With my updated 'generalized' apply-generic procedure. I do feel it is sufficiently general because we try to find the proc for all matching
+;; coercions.
+;; Although, an argument can be made that since I use the first matching coerced args with a matching proc, it may not be the best choice
+;; (maybe another coercion would be more accurate). This is because coercions are attempted in the order of the arguments, so if a the
+;; first argument has a not-as-accurate type, but all other args can be coerced to it and there exists a proc for these args, then we will
+;; use that one because we don't know about the accuracy.
 
 ;; Original two argument version
 ;; (define (apply-generic op . args)
@@ -45,9 +47,9 @@
         (rat1 (make-rational 1 2))
         (rat2 (make-rational 3 8)))
 
-    (println complex1)
-    ;; Attempting with rational numbers as the first couple of args or just one to test the coercion that doesn't exist
-    ;; (we don't have coercion for rational->other-numbers installed)
+    ;; This will attempt to turn all arguments to rationals first, but no coercions exist (we didn't install any), so then we try to turn
+    ;; all arguments to the next arg type (complex), that works, so then we look up a 'add procedure for 5 complex numbers, if it exists GREAT, if not then we try to coerce all arguments to scheme-numbers, same thing repeats.
+    ;; In this case we will add all numbers as complex because that coercion and add proc exist.
     (println (add rat1 complex2 rat2 8 7))))
 
 ;; My multiple argument version
@@ -75,17 +77,16 @@
              (t1 (type-tag arg))
              (coerced-args (coerce-args args t1)))
         (if coerced-args
-          coerced-args
+          (let ((type-tags (map type-tag coerced-args)))
+            (let ((proc (get op type-tags)))
+              (if proc
+                (apply proc (map contents coerced-args))
+                (coerce-first-matching-type (cdr sub-args)))))
           (coerce-first-matching-type (cdr sub-args))))))
 
-    (if (< (length args) 1)
-      (error "Must have at least one argument")
-      (let ((type-tags (map type-tag args)))
-        (let ((proc (get op type-tags)))
-          (if proc
-            (apply proc (map contents args))
-            (let* ((coerced-args (coerce-first-matching-type args)))
-              (apply apply-generic (append (list op) coerced-args)))))))) ;;)
+  (if (< (length args) 1)
+    (error "Must have at least one argument")
+    (coerce-first-matching-type args)))
 
 ;; Packages
 (define (install-coercion-package)
