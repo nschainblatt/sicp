@@ -115,15 +115,19 @@
   (define (scheme-number->complex n)
     (make-complex-from-real-imag (contents n) 0))
 
-  (trace scheme-number->complex)
-
   (define (complex->scheme-number n)
     (make-scheme-number (car (contents (contents n)))))
 
-  (trace complex->scheme-number)
+  (define (rational->scheme-number n)
+    (make-scheme-number (/ (car (contents n)) (cdr (contents n)))))
+
+  (define (complex->rational n)
+    (make-complex-from-real-imag (/ (car (contents n)) (cdr (contents n))) 0))
 
   (put 'scheme-number 'complex scheme-number->complex)
-  (put 'complex 'scheme-number complex->scheme-number))
+  (put 'complex 'scheme-number complex->scheme-number)
+  (put 'rational 'scheme-number rational->scheme-number)
+  (put 'rational 'complex complex->rational))
 
 
 ;; SCHEME-NUMBER
