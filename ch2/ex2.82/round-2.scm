@@ -74,20 +74,22 @@
 
   ;; Converts all sub-args to t1 or returns false if not possible (no coercion procedure found for types)
   (define (coerce-args sub-args t1)
-    (if (null? sub-args)
-      '()
-      (let* ((arg (car sub-args))
-             (t2 (type-tag arg))
-             (t2->t1 (get t2 t1)))
-        (cond ((equal? t1 t2) (cons arg (coerce-args (cdr sub-args) t1))) ;; same type, no need to coerce, add to built list
-              (t2->t1 (cons (t2->t1 arg) (coerce-args (cdr sub-args) t1))) ;; coercion exists, convert and add to built list
-              (else #f)))))                                               ;; No type coercion found
+    (define (iter inner-args result)
+      (if (null? inner-args)
+        result
+        (let* ((arg (car inner-args))
+               (t2 (type-tag arg))
+               (t2->t1 (get t2 t1)))
+          (cond ((equal? t1 t2) (iter (cdr inner-args) (append result (list arg))))  ;; same type, no need to coerce, add to built list
+                (t2->t1 (iter (cdr inner-args) (append result (list (t2->t1 arg))))) ;; coercion exists, convert and add to built list
+                (else #f)))))
+    (iter sub-args '()))                                               ;; No type coercion found
 
   ;; Converts all outer args to the type of the first arg in sub-args. Returns on first full match. Tries all types in sub-args until first
   ;; match found.
   (define (coerce-first-matching-type sub-args)
     (if (null? sub-args)
-      (error "Complete coercion not possible" args)
+      (error "Complete coercion not possible, no coercion procedure applicable to all arguments:" args)
       (let* ((arg (car sub-args))
              (t1 (type-tag arg))
              (coerced-args (coerce-args args t1)))
