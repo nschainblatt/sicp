@@ -45,7 +45,7 @@
         (complex2 (make-complex-from-real-imag 4 9)))
 
     (println complex1)
-    (println (add complex2 6))))
+    (println (add complex2 6 complex1))))
 
 ;; My multiple argument version
 
@@ -66,11 +66,11 @@
 ;; 2. call this procedure, if the procedure is falsey, call it again with the next type, otherwise call apply-generic again with it's results.
 
 
-(define call-count 0)
+;; (define call-count 0)
 
 (define (apply-generic op . args)
 
-  (set! call-count (+ call-count 1))
+  ;; (set! call-count (+ call-count 1))
 
   ;; Converts all sub-args to t1 or returns false if not possible (no coercion procedure found for types)
   (define (coerce-args sub-args t1)
@@ -95,8 +95,8 @@
           coerced-args
           (coerce-first-matching-type (cdr sub-args))))))
 
-  (if (> call-count 5)
-    (error "DEBUG")
+  ;; (if (> call-count 5)
+    ;; (error "DEBUG")
     (if (< (length args) 1)
       (error "Must have at least one argument")
       (let ((type-tags (map type-tag args)))
@@ -104,7 +104,7 @@
           (if proc
             (apply proc (map contents args))
             (let* ((coerced-args (coerce-first-matching-type args)))
-              (apply apply-generic (append (list op) coerced-args)))))))))
+              (apply apply-generic (append (list op) coerced-args)))))))) ;;)
 
 (trace apply-generic)
 
@@ -129,7 +129,7 @@
   ((get 'make 'scheme-number) x))
 (define (install-scheme-number-package)
   (define (tag x) (attach-tag 'scheme-number x))
-  (put 'add '(scheme-number scheme-number) (lambda (x y) (tag (+ x y))))
+  (put 'add '(scheme-number scheme-number scheme-number) (lambda (x y) (tag (+ x y))))
   (put 'sub '(scheme-number scheme-number)
        (lambda (x y) (tag (- x y))))
   (put 'mul '(scheme-number scheme-number)
@@ -205,9 +205,11 @@
     (attach-tag 'rectangular (cons x y)))
   (define (make-from-mag-ang r a)
     ((get 'make-from-mag-ang 'polar) r a))
-  (define (add-complex z1 z2)
-    (make-from-real-imag (+ (real-part (contents z1)) (real-part (contents z2)))
-                         (+ (imag-part (contents z1)) (imag-part (contents z2)))))
+  (define (add-complex . args)
+    (accumulate (lambda (z1 z2) (make-from-real-imag (+ (real-part (contents z1)) (real-part (contents z2)))
+                                                     (+ (imag-part (contents z1)) (imag-part (contents z2)))))
+                (make-from-real-imag 0 0)
+                args))
   (define (sub-complex z1 z2)
     (make-from-real-imag (- (real-part z1) (real-part z2))
                          (- (imag-part z1) (imag-part z2))))
@@ -219,8 +221,8 @@
                        (- (angle z1) (angle z2))))
   ;; interface to rest of the system
   (define (tag z) (attach-tag 'complex z))
-  (put 'add '(complex complex)
-       (lambda (z1 z2) (tag (add-complex z1 z2))))
+  (put 'add '(complex complex complex)
+       (lambda (z1 z2 z3) (tag (add-complex z1 z2 z3))))
   (put 'sub '(complex complex)
        (lambda (z1 z2) (tag (sub-complex z1 z2))))
   (put 'mul '(complex complex)
@@ -300,3 +302,8 @@
         (else (error "Bad tagged datum: CONTENTS" datum))))
 
 (define (square x) (* x x))
+
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+    initial
+    (op (car sequence) (accumulate op initial (cdr sequence)))))
