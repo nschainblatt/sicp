@@ -1,5 +1,3 @@
-(require racket/trace)
-
 ;; The reason the original two argument version of apply-generic is not sufficiently general is because
 ;; if both the coercions of t1->t2 and  t2->t1 exist, only t1->t2 will every be tried. This is because t1->t2 will be truthy in the cond,
 ;; leading to another call to apply-generic with the two arguments of type t2, then, because we don't have identity coercions added in the table
@@ -48,33 +46,11 @@
 
     (println complex1)
     ;; Attempting with rational numbers as the first couple of args or just one to test the coercion that doesn't exist
-    ;; (we don't have coercion for rational numbers installed)
+    ;; (we don't have coercion for rational->other-numbers installed)
     (println (add rat1 complex2 rat2 8 7))))
 
 ;; My multiple argument version
-
-;; To handle any number of arguments, we must iterate over them all.
-;; We have to iterate over them all with every arguments type (starting with the first type)
-;; We have to attempt to get with that type for all remaining arguments, ignoring if its the same type
-;; The first type that allows all other argument to coerce to that type will be the argument list passed back to apply-generic to find the proc.
-;; NOTE that this will be the reason that this is not sufficiently general because we will fail is this new argument list fails to find a proc 
-;; (because all the types are the same and we don't support identity coercions because they would lead to infinite loops)
-;; If not all arguments can coerce to the selected type, then we try again with the following arguments type, if none match, then we error.
-
-;; STEPS:
-;; 1. create an inner procedure inside apply-generic to allow us to remember the original args list (to try again with the next type if nec)
-;;    - this procedure will have as args (type, sub-args) where type is the type of the current arg we are trying to coerce all other to,
-;;      and sub-args will be the args to coerce. 
-;;      Each iteration in this procedure we will attempt to coerce the subsequent arg while building up the coerced list to return.
-;;      As soon as one arg won't coerce, we should return early with a signal to try with the next type.
-;; 2. call this procedure, if the procedure is falsey, call it again with the next type, otherwise call apply-generic again with it's results.
-
-
-;; (define call-count 0)
-
 (define (apply-generic op . args)
-
-  ;; (set! call-count (+ call-count 1))
 
   ;; Converts all sub-args to t1 or returns false if not possible (no coercion procedure found for types)
   (define (coerce-args sub-args t1)
@@ -101,8 +77,6 @@
           coerced-args
           (coerce-first-matching-type (cdr sub-args))))))
 
-  ;; (if (> call-count 5)
-    ;; (error "DEBUG")
     (if (< (length args) 1)
       (error "Must have at least one argument")
       (let ((type-tags (map type-tag args)))
@@ -111,8 +85,6 @@
             (apply proc (map contents args))
             (let* ((coerced-args (coerce-first-matching-type args)))
               (apply apply-generic (append (list op) coerced-args)))))))) ;;)
-
-(trace apply-generic)
 
 ;; Packages
 (define (install-coercion-package)
@@ -152,6 +124,7 @@
   (put 'exp '(scheme-number scheme-number)
        (lambda (x y) (tag (expt x y))))
   'done)
+
 
 ;; RATIONAL
 (define (make-rational n d)
@@ -195,8 +168,8 @@
 
   (put '=zero? '(rational) (lambda (x) (and (rational? x)
                                             (= (numer (contents x)) 0))))
-
   'done)
+
 
 ;; COMPLEX
 (define (make-complex-from-real-imag x y)
@@ -257,6 +230,7 @@
   'done)
 
 
+;; OPERATIONS TYPE TABLE
 (define (apply-specific operation type . args)
   (apply (get operation type) args))
 
@@ -311,6 +285,8 @@
         ((number? datum) datum)
         (else (error "Bad tagged datum: CONTENTS" datum))))
 
+
+;; HELPERS
 (define (square x) (* x x))
 
 (define (accumulate op initial sequence)
