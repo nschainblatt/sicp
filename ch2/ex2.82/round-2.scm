@@ -3,9 +3,10 @@
 ;; leading to another call to apply-generic with the two arguments of type t2, then, because we don't have identity coercions added in the table
 ;; the procedure will end with an error because no proc or coercion procs were found.
 
-;; My attempted 'generalized' apply-generic procedure is also no sufficiently general because of the same reason, the first match against a 
-;; coercion will then not attempt any of the other coercions found in the same cond. Leading to not all existing coercions for the arguments
-;; to be attempted. This procedure prioritizes the first match, so the order matters.
+;; My attempted 'generalized' apply-generic procedure is also not sufficiently general because of the same reason, the first match of a coercion
+;; that works against all arguments will be selected (first condition in cond) and will be supplied to the following call to apply-generic.
+;; Then if there is no proc found for this subsequent call, an error will be thrown as no more coercions can be tried (all arguments have the
+;; same value) and no proc was found.
 
 ;; Original two argument version
 ;; (define (apply-generic op . args)
