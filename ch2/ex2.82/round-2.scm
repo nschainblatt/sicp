@@ -77,16 +77,20 @@
              (t1 (type-tag arg))
              (coerced-args (coerce-args args t1)))
         (if coerced-args
-          (let ((type-tags (map type-tag coerced-args)))
-            (let ((proc (get op type-tags)))
-              (if proc
-                (apply proc (map contents coerced-args))
-                (coerce-first-matching-type (cdr sub-args)))))
+          (let* ((type-tags (map type-tag coerced-args))
+                 (proc (get op type-tags)))
+            (if proc
+              (apply proc (map contents coerced-args))
+              (coerce-first-matching-type (cdr sub-args))))
           (coerce-first-matching-type (cdr sub-args))))))
 
   (if (< (length args) 1)
     (error "Must have at least one argument")
-    (coerce-first-matching-type args)))
+    (let* ((type-tags (map type-tag args))
+           (proc (get op type-tags)))
+      (if proc
+        (apply proc (map contents args))
+        (coerce-first-matching-type args)))))
 
 ;; Packages
 (define (install-coercion-package)
