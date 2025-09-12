@@ -45,7 +45,7 @@
         (complex2 (make-complex-from-real-imag 4 9)))
 
     (println complex1)
-    (println (add complex2 6 complex1))))
+    (println (add 7 6 complex1 complex1 7))))
 
 ;; My multiple argument version
 
@@ -129,7 +129,7 @@
   ((get 'make 'scheme-number) x))
 (define (install-scheme-number-package)
   (define (tag x) (attach-tag 'scheme-number x))
-  (put 'add '(scheme-number scheme-number scheme-number) (lambda (x y) (tag (+ x y))))
+  (put 'add '(scheme-number scheme-number scheme-number scheme-number scheme-number) (lambda args (tag (accumulate + 0 args))))
   (put 'sub '(scheme-number scheme-number)
        (lambda (x y) (tag (- x y))))
   (put 'mul '(scheme-number scheme-number)
@@ -221,8 +221,8 @@
                        (- (angle z1) (angle z2))))
   ;; interface to rest of the system
   (define (tag z) (attach-tag 'complex z))
-  (put 'add '(complex complex complex)
-       (lambda (z1 z2 z3) (tag (add-complex z1 z2 z3))))
+  (put 'add '(complex complex complex complex complex)
+       (lambda (z1 z2 z3 z4 z5) (tag (add-complex z1 z2 z3 z4 z5))))
   (put 'sub '(complex complex)
        (lambda (z1 z2) (tag (sub-complex z1 z2))))
   (put 'mul '(complex complex)
