@@ -42,10 +42,14 @@
   (install-coercion-package)
 
   (let ((complex1 (make-complex-from-real-imag 3 5))
-        (complex2 (make-complex-from-real-imag 4 9)))
+        (complex2 (make-complex-from-real-imag 4 9))
+        (rat1 (make-rational 1 2))
+        (rat2 (make-rational 3 8)))
 
     (println complex1)
-    (println (add 7 6 complex1 complex1 7))))
+    ;; Attempting with rational numbers as the first couple of args or just one to test the coercion that doesn't exist
+    ;; (we don't have coercion for rational numbers installed)
+    (println (add rat1 complex2 rat2 8 7))))
 
 ;; My multiple argument version
 
