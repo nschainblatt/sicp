@@ -6,17 +6,22 @@
   (install-raise-package)
   (install-project-package)
   (install-polynomial-package)
-  (let* ((polynomial1 (make-sparse-polynomial 'x (list (list 4 1) (list 3 2) (list 2 3) (list 1 4) (list 0 5))))
-         (polynomial6 (make-dense-polynomial 'x (list 1 2 3 4 5)))
-         (polynomial7 (make-dense-polynomial 'x (list 1 2 3 4 5 6)))
-         (polynomial2 (make-sparse-polynomial 'x (list (list 2 polynomial1) (list 0 7))))
-         (polynomial3 (make-sparse-polynomial 'x (list (list 2 0))))
-         (polynomial4 (make-sparse-polynomial 'x '()))
-         (polynomial5 (make-sparse-polynomial 'x (list (list 2 2) (list 0 2)))))
+  (let* ((polynomial1 (make-polynomial 'x (list (list 4 1) (list 3 2) (list 2 3) (list 1 4) (list 0 5))))
+         (polynomial6 (make-polynomial 'x (list 1 2 3 4 5)))
+         (polynomial7 (make-polynomial 'x (list 1 2 3 4 5 6)))
+         (polynomial2 (make-polynomial 'x (list (list 2 polynomial1) (list 0 7))))
+         (polynomial3 (make-polynomial 'x (list (list 2 0))))
+         (polynomial4 (make-polynomial 'x '()))
+         (polynomial5 (make-polynomial 'x (list (list 2 2) (list 0 2)))))
 
-    (println (add polynomial6 polynomial6))
     (println (add polynomial1 polynomial1))
-    (println (equ? polynomial6 polynomial1))
+    (println (add polynomial6 polynomial6))
+
+    (println (add polynomial1 polynomial6))
+    (println (add polynomial6 polynomial6))
+
+    (println (sub polynomial1 polynomial6))
+
     (println (=zero? (sub polynomial1 polynomial6)))))
 
 (define exact inexact->exact)
@@ -65,27 +70,12 @@
 
 ;; POLYNOMIALS
 
-;; TODO:
-;; one constructor, but the term-list has a type attached to it?
-;; then the type of the term-list is used to choose the correct selectors for the arithmetic operations?
-;; then there are two generic constructors that tag the term-list accordingly so the user doesn't have to worry about the implementation
-
 ;; Constructors
-(define (make-sparse-polynomial var term-list)
-  (apply-specific 'make-sparse 'polynomial var term-list))
-(define (make-dense-polynomial var term-list)
-  (apply-specific 'make-dense 'polynomial var term-list))
+(define (make-polynomial var term-list)
+  (apply-specific 'make 'polynomial var term-list))
 
 (define (install-polynomial-package)
-  (define (make-poly-sparse variable term-list) (cons variable term-list))
-  (define (make-poly-dense variable term-list)
-    (define (transform-dense-to-sparse L)
-      (if (null? L) '()
-        (let* ((coeff (car L))
-               (rest (cdr L))
-               (len (length L)))
-          (cons (make-term (- len 1) coeff) (transform-dense-to-sparse rest)))))
-    (cons variable (transform-dense-to-sparse term-list)))
+  (define (make-poly variable term-list) (cons variable term-list))
   (define (variable p) (car p))
   (define (term-list p) (cdr p))
   (define (same-variable? v1 v2)
@@ -103,17 +93,17 @@
           (else #f)))
   (define (add-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
-      (make-poly-sparse (variable p1)
+      (make-poly (variable p1)
                  (add-terms (term-list p1) (term-list p2)))
       (error "Polys not in same var: ADD-POLY" (list p1 p2))))
   (define (sub-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
-      (make-poly-sparse (variable p1)
+      (make-poly (variable p1)
                  (sub-terms (term-list p1) (term-list p2)))
       (error "Polys not in same var: SUB-POLY" (list p1 p2))))
   (define (mul-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
-      (make-poly-sparse (variable p1)
+      (make-poly (variable p1)
                  (mul-terms (term-list p1) (term-list p2)))
       (error "Polys not in same var: MUL-POLY" (list p1 p2))))
   (define (add-terms L1 L2)
@@ -154,7 +144,7 @@
           (mul-term-by-all-terms t1 (rest-terms L))))))
 
   (define (negate-polynomial p)
-    (make-poly-sparse (variable p) (negate-terms (term-list p))))
+    (make-poly (variable p) (negate-terms (term-list p))))
 
   (define (negate-terms t)
     (if (empty-termlist? t)
@@ -165,7 +155,17 @@
   (define (order term) (car term))
   (define (coeff term) (cadr term))
   (define (the-empty-termlist) '())
-  (define (first-term term-list) (car term-list))
+
+  (define (first-term term-list)
+    (if (null? term-list) (error "term-list cannot be null")
+      (if (pair? (car term-list))
+        (first-term-sparse term-list)
+        (first-term-dense term-list))))
+
+  (define (first-term-dense term-list)
+    (make-term (- (length term-list) 1) (car term-list)))
+  (define (first-term-sparse term-list)
+    (car term-list))
   (define (rest-terms term-list) (cdr term-list))
   (define (empty-termlist? term-list) (null? term-list))
   (define (make-term order coeff) (list order coeff))
@@ -174,10 +174,8 @@
        (lambda (p1 p2) (tag (add-poly p1 p2))))
   (put 'mul '(polynomial polynomial)
        (lambda (p1 p2) (tag (mul-poly p1 p2))))
-  (put 'make-sparse 'polynomial
-       (lambda (var terms) (tag (make-poly-sparse var terms))))
-  (put 'make-dense 'polynomial
-       (lambda (var terms) (tag (make-poly-dense var terms))))
+  (put 'make 'polynomial
+       (lambda (var terms) (tag (make-poly var terms))))
   (put 'equ? '(polynomial polynomial) equal?)
   (put '=zero? '(polynomial) polynomial-zero?)
   (put 'negate '(polynomial) (lambda (x) (tag (negate-polynomial x))))
