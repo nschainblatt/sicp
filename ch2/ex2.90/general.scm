@@ -73,18 +73,16 @@
 (define (make-dense-term-list term-list)
   (attach-tag 'dense term-list))
 
-;; TODO:
-;; Write a term-list packages that will contain the specific selectors for it's type
-;; Install these packages in the polynomial package
-;; Define generic selectors in the polynomial package to dispatch to the correct types specific implementation of the selector
-;; Debug weird type bugs and empty checks n stuff
-
 (define (install-dense-term-list-package)
   (define (tag x) (attach-tag 'dense x))
   (define (make-term order coeff) (list order coeff))
   (define (first-term term-list)
     (make-term (- (length term-list) 1)
-               (if (pair? (car term-list))
+               ;; NOTE: this condition is required as my make-term for dense puts the order information
+               ;; inside the term structure, leading to the representation looking more like sparse.
+               ;; This is required because the terms must supply the order information in order to not change the implementation
+               ;; of the geenric arithmetic procedures for polynomials.
+               (if (pair? (car term-list)) 
                  (cadar term-list)
                  (car term-list))))
   (define (rest-terms term-list)
