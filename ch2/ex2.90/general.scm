@@ -5,22 +5,19 @@
   (install-complex-package)
   (install-raise-package)
   (install-project-package)
-  (install-base-polynomial-package)
-  (let* ((polynomial1 (make-sparse-polynomial 'x (list (list 4 1) (list 3 2) (list 2 3) (list 1 4) (list 0 5))))
-         (polynomial6 (make-dense-polynomial 'x (list 1 2 3 4 5)))
-         (polynomial7 (make-dense-polynomial 'x (list 1 2 3 4 5 6)))
-         (polynomial2 (make-sparse-polynomial 'x (list (list 2 polynomial1) (list 0 7))))
-         (polynomial3 (make-sparse-polynomial 'x (list (list 2 0))))
-         (polynomial4 (make-sparse-polynomial 'x '()))
-         (polynomial5 (make-sparse-polynomial 'x (list (list 2 2) (list 0 2)))))
+  (install-polynomial-package)
+  (let* ((polynomial1 (make-polynomial 'x (make-sparse-term-list (list (list 4 1) (list 3 2) (list 2 3) (list 1 4) (list 0 5)))))
+         (polynomial2 (make-polynomial 'x (make-dense-term-list (list 1 2 3 4 5)))))
 
-    (println (apply-specific 'add '(dense dense) (contents (contents polynomial6)) (contents (contents polynomial6))))
-    (println (contents (add polynomial6 polynomial6)))
+    (println (add polynomial1 polynomial1))
+    (println (add polynomial2 polynomial2))
 
-    (newline)
+    (println (add polynomial1 polynomial2))
+    (println (add polynomial2 polynomial2))
 
-    (println (apply-specific 'add '(sparse sparse) (contents (contents polynomial1)) (contents (contents polynomial1))))
-    (println (contents (add polynomial1 polynomial1)))))
+    (println (sub polynomial1 polynomial2))
+
+    (println (=zero? (sub polynomial1 polynomial2)))))
 
 (define exact inexact->exact)
 
@@ -31,7 +28,7 @@
 (define (sub x y)
   (apply-generic 'sub x y))
 
-(define (square x) 
+(define (square x)
   (apply-generic 'square x))
 
 (define (mysqrt x)
@@ -69,132 +66,44 @@
 ;; POLYNOMIALS
 
 ;; Constructors
-(define (make-sparse-polynomial var terms)
-  ((get 'make-sparse 'polynomial) var terms))
-(define (make-dense-polynomial var terms)
-  ((get 'make-dense 'polynomial) var terms))
+(define (make-polynomial var term-list)
+  (apply-specific 'make 'polynomial var term-list))
+(define (make-sparse-term-list term-list)
+  (attach-tag 'sparse term-list))
+(define (make-dense-term-list term-list)
+  (attach-tag 'dense term-list))
 
-;; BASE POLYNOMIAL
-(define (install-base-polynomial-package)
-  (install-sparse-polynomial-package)
-  (install-dense-polynomial-package)
-  (define (tag p) (attach-tag 'polynomial p))
-  (put 'make-sparse 'polynomial (lambda (var terms) (tag ((get 'make-sparse 'sparse) var terms))))
-  (put 'make-dense 'polynomial (lambda (var terms) (tag ((get 'make-dense 'dense) var terms))))
-  ;; NOTE: using apply-specific here since we've already reached this point via the first apply-generic, apply-generic simplifies answers,
-  ;; and I don't want to add 'dense and 'sparse types to the tower, I only want 'polynomial.
-  (put 'add '(polynomial polynomial) (lambda (p1 p2) (tag (apply-specific 'add (list (type-tag p1) (type-tag p2)) (contents p1) (contents p2)))))
-  (put 'sub '(polynomial polynomial) (lambda (x y) (tag (apply-specific 'sub (list (type-tag x)) (contents x) (contents y)))))
-  (put 'mul '(polynomial polynomial) (lambda (p1 p2) (tag (apply-specific 'mul (list (type-tag p1) (type-tag p2)) (contents p1) (contents p2)))))
-  (put 'equ? '(polynomial polynomial) (lambda (x y) (apply-specific 'equ? (list (type-tag x)) (contents x) (contents y))))
-  (put '=zero? '(polynomial) (lambda (x) (apply-specific '=zero? (list (type-tag x)) (contents x))))
-  (put 'negate '(polynomial) (lambda (x) (tag (apply-specific 'negate (list (type-tag x)) (contents x)))))
-  'done)
+;; TODO:
+;; Write a term-list packages that will contain the specific selectors for it's type
+;; Install these packages in the polynomial package
+;; Define generic selectors in the polynomial package to dispatch to the correct types specific implementation of the selector
+;; Debug weird type bugs and empty checks n stuff
 
-;; DENSE
-(define (install-dense-polynomial-package)
-  (define (make-poly variable term-list) (cons variable term-list))
-  (define (variable p) (car p))
-  (define (term-list p) (cdr p))
-  (define (same-variable? v1 v2)
-    (and (variable? v1) (variable? v2) (eq? v1 v2)))
-  (define (variable? x) (symbol? x))
-  (define (adjoin-term term term-list)
-    (if (=zero? (coeff term))
-      term-list
-      (cons term term-list)))
-  (define (polynomial-zero? p)
-    (or (empty-termlist? (term-list p)) (all-coefs-zero? (term-list p))))
-  (define (all-coefs-zero? term-list)
-    (cond ((null? term-list) #t)
-          ((=zero? (coeff (first-term term-list))) (all-coefs-zero? (rest-terms term-list)))
-          (else #f)))
-  (define (add-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
-      (make-poly (variable p1)
-                 (add-terms (term-list p1) (term-list p2)))
-      (error "Polys not in same var: ADD-POLY" (list p1 p2))))
-  (define (sub-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
-      (make-poly (variable p1)
-                 (sub-terms (term-list p1) (term-list p2)))
-      (error "Polys not in same var: SUB-POLY" (list p1 p2))))
-  (define (mul-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
-      (make-poly (variable p1)
-                 (mul-terms (term-list p1) (term-list p2)))
-      (error "Polys not in same var: MUL-POLY" (list p1 p2))))
-  (define (add-terms L1 L2)
-    (cond ((empty-termlist? L1) L2)
-          ((empty-termlist? L2) L1)
-          (else
-            (let ((t1 (first-term L1))
-                  (t2 (first-term L2)))
-              (cond ((> (order L1) (order L2))
-                     (adjoin-term
-                       t1 (add-terms (rest-terms L1) L2)))
-                    ((< (order L1) (order L2))
-                     (adjoin-term
-                       t2 (add-terms L1 (rest-terms L2))))
-                    (else
-                      (adjoin-term
-                        (make-term (add (coeff t1) (coeff t2)))
-                        (add-terms (rest-terms L1)
-                                   (rest-terms L2)))))))))
-  (define (sub-terms L1 L2)
-    (cond ((empty-termlist? L2) L1)
-          ((empty-termlist? L1) (negate-terms L2))
-          (else (add-terms L1 (negate-terms L2)))))
+(define (install-dense-term-list-package)
+  (define (tag x) (attach-tag 'dense x))
+  (define (make-term order coeff) (list order coeff))
+  (define (first-term term-list)
+    (make-term (- (length term-list) 1)
+               (if (pair? (car term-list))
+                 (cadar term-list)
+                 (car term-list))))
+  (define (rest-terms term-list)
+    (tag (cdr term-list)))
+  (put 'first-term 'dense first-term)
+  (put 'rest-terms 'dense rest-terms))
 
-  (define (mul-terms L1 L2)
-    (if (empty-termlist? L1)
-      (the-empty-termlist)
-      (add-terms (mul-term-by-all-terms (first-term L1) L2)
-                 (mul-terms (rest-terms L1) L2))))
-
-  (define (mul-term-by-all-terms t1 L)
-    (if (empty-termlist? L)
-      (the-empty-termlist)
-      (let ((t2 (first-term L)))
-        (adjoin-term
-          (make-term (mul (coeff t1) (coeff t2)))
-          (mul-term-by-all-terms t1 (rest-terms L))))))
-
-  (define (negate-polynomial p)
-    (make-poly (variable p) (negate-terms (term-list p))))
-
-  (define (negate-terms t)
-    (if (empty-termlist? t)
-      (the-empty-termlist)
-      (let ((term (first-term t)))
-        (adjoin-term (make-term (apply-generic 'negate (coeff term))) (negate-terms (rest-terms t))))))
-
-  ;; Returns the order of the first term in the term-list
-  ;; Note that it's required to pass the term-list instead of just the term like the sparse representation because the length of
-  ;; the term list is used to calculate the order.
-  (define (order term-list)
-    (- (length term-list) 1))
-  (define (coeff term) term)
-  (define (the-empty-termlist) '())
+(define (install-sparse-term-list-package)
+  (define (tag x) (attach-tag 'sparse x))
+  (define (make-term order coeff) (list order coeff))
   (define (first-term term-list) (car term-list))
-  (define (rest-terms term-list) (cdr term-list))
-  (define (empty-termlist? term-list) (null? term-list))
-  (define (make-term coeff) coeff)
-  (define (tag p) (attach-tag 'dense p))
-  (put 'add '(dense dense)
-       (lambda (p1 p2) (tag (add-poly p1 p2))))
-  (put 'mul '(dense dense)
-       (lambda (p1 p2) (tag (mul-poly p1 p2))))
-  (put 'make-dense 'dense
-       (lambda (var terms) (tag (make-poly var terms))))
-  (put 'equ? '(dense dense) equal?)
-  (put '=zero? '(dense) polynomial-zero?)
-  (put 'negate '(dense) (lambda (x) (tag (negate-polynomial x))))
-  (put 'sub '(dense dense) (lambda (x y) (tag (sub-poly x y))))
-  'done)
+  (define (rest-terms term-list)
+    (tag (cdr term-list)))
+  (put 'first-term 'sparse first-term)
+  (put 'rest-terms 'sparse rest-terms))
 
-;; SPARSE
-(define (install-sparse-polynomial-package)
+(define (install-polynomial-package)
+  (install-dense-term-list-package)
+  (install-sparse-term-list-package)
   (define (make-poly variable term-list) (cons variable term-list))
   (define (variable p) (car p))
   (define (term-list p) (cdr p))
@@ -208,7 +117,7 @@
   (define (polynomial-zero? p)
     (or (empty-termlist? (term-list p)) (all-coefs-zero? (term-list p))))
   (define (all-coefs-zero? term-list)
-    (cond ((null? term-list) #t)
+    (cond ((null? term-list))
           ((=zero? (coeff (first-term term-list))) (all-coefs-zero? (rest-terms term-list)))
           (else #f)))
   (define (add-poly p1 p2)
@@ -244,6 +153,7 @@
                                    (add (coeff t1) (coeff t2)))
                         (add-terms (rest-terms L1)
                                    (rest-terms L2)))))))))
+
   (define (sub-terms L1 L2)
     (cond ((empty-termlist? L2) L1)
           ((empty-termlist? L1) (negate-terms L2))
@@ -266,31 +176,44 @@
   (define (negate-polynomial p)
     (make-poly (variable p) (negate-terms (term-list p))))
 
-  (define (negate-terms t)
-    (if (empty-termlist? t)
-      (the-empty-termlist)
-      (let ((term (first-term t)))
-        (adjoin-term (make-term (order term) (apply-generic 'negate (coeff term))) (negate-terms (rest-terms t))))))
 
+  ;; generic selectors
+  (define (first-term term-list)
+    (apply-specific 'first-term (type-tag term-list) (contents term-list)))
+  (define (rest-terms term-list)
+    (apply-specific 'rest-terms (type-tag term-list) (contents term-list)))
+  (define (empty-termlist? term-list)
+    (equal? (contents term-list) (the-empty-termlist)))
+  (define (negate-terms term-list)
+    (define (inner t)
+      (if (empty-termlist? t)
+        (the-empty-termlist)
+        (let ((term (first-term t)))
+          (adjoin-term (make-term (order term) (apply-generic 'negate (coeff term))) (inner (rest-terms t))))))
+    (attach-tag (type-tag term-list) (inner term-list)))
+
+
+  ;; selectors
   (define (order term) (car term))
   (define (coeff term) (cadr term))
   (define (the-empty-termlist) '())
-  (define (first-term term-list) (car term-list))
-  (define (rest-terms term-list) (cdr term-list))
-  (define (empty-termlist? term-list) (null? term-list))
   (define (make-term order coeff) (list order coeff))
-  (define (tag p) (attach-tag 'sparse p))
-  (put 'add '(sparse sparse)
+  (define (tag p) (attach-tag 'polynomial p))
+
+  ;; interface to the rest of the system
+  (put 'add '(polynomial polynomial)
        (lambda (p1 p2) (tag (add-poly p1 p2))))
-  (put 'mul '(sparse sparse)
+  (put 'mul '(polynomial polynomial)
        (lambda (p1 p2) (tag (mul-poly p1 p2))))
-  (put 'make-sparse 'sparse
+  (put 'make 'polynomial
        (lambda (var terms) (tag (make-poly var terms))))
-  (put 'equ? '(sparse sparse) equal?)
-  (put '=zero? '(sparse) polynomial-zero?)
-  (put 'negate '(sparse) (lambda (x) (tag (negate-polynomial x))))
-  (put 'sub '(sparse sparse) (lambda (x y) (tag (sub-poly x y))))
+  (put 'equ? '(polynomial polynomial) equal?)
+  (put '=zero? '(polynomial) polynomial-zero?)
+  (put 'negate '(polynomial) (lambda (x) (tag (negate-polynomial x))))
+  (put 'sub '(polynomial polynomial) (lambda (x y) (tag (sub-poly x y))))
   'done)
+
+
 
 ;; INTEGER 
 (define (make-integer x)
