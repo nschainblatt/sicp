@@ -1,5 +1,3 @@
-(require racket/trace)
-
 (define (main)
   (install-integer-package)
   (install-rational-package)
@@ -14,8 +12,7 @@
     (println (add polynomial1 polynomial1))
     (println (add polynomial2 polynomial2))
     (println (add polynomial1 polynomial2))
-
-    ))
+    (println (mul polynomial1 polynomial2))))
 
 (define exact inexact->exact)
 
@@ -156,11 +153,7 @@
           (if (= (order t1) 0)
             (adjoin-term t1 (make-term-list (rest-terms sub-p)))
             (adjoin-term (make-term 0 (tag (make-poly (variable p) (adjoin-term t1 (attach-tag (type-tag (term-list p)) (the-empty-termlist)))))) (rest-terms sub-p))))))
-    (trace make-term-list)
     (make-poly var (make-term-list (term-list p))))
-
-  (trace convert-polynomial-variable)
-  ;; (trace adjoin-term)
 
   (define (add-poly p1 p2)
     (let* ((v1 (variable p1))
@@ -177,11 +170,17 @@
       (make-poly (variable p1)
                  (sub-terms (term-list p1) (term-list p2)))
       (error "Polys not in same var: SUB-POLY" (list p1 p2))))
+
   (define (mul-poly p1 p2)
-    (if (same-variable? (variable p1) (variable p2))
-      (make-poly (variable p1)
-                 (mul-terms (term-list p1) (term-list p2)))
-      (error "Polys not in same var: MUL-POLY" (list p1 p2))))
+    (let* ((v1 (variable p1))
+           (converted-p2 (if (same-variable? v1 (variable p2))
+                           p2
+                           (convert-polynomial-variable p2 v1))))
+      (if (same-variable? (variable p1) (variable converted-p2))
+        (make-poly (variable p1)
+                   (mul-terms (term-list p1) (term-list converted-p2)))
+        (error "Polys not in same var: MUL-POLY" (list p1 converted-p2)))))
+
   (define (add-terms L1 L2)
     (cond ((empty-termlist? L1) L2)
           ((empty-termlist? L2) L1)
@@ -237,8 +236,6 @@
         (list (make-poly (variable p1) quotient-term-list) (make-poly (variable p1) remainder-term-list)))
       (error "Polys not in same var: DIV-POLY" (list p1 p2))))
 
-  ;; (trace div-poly)
-
   (define (div-terms L1 L2)
     (if (empty-termlist? L1)
       (list (attach-tag (type-tag L1) (the-empty-termlist)) (attach-tag (type-tag L1) (the-empty-termlist)))
@@ -256,8 +253,6 @@
                      (remainder-term-list (cadr quotient-remainder-term-lists)))
                 (list (adjoin-term new-term quotient-term-list) remainder-term-list))))))))
 
-  ;; (trace div-terms)
-
   (define (negate-polynomial p)
     (make-poly (variable p) (negate-terms (term-list p))))
 
@@ -267,17 +262,18 @@
     (define (add-int-to-term-list term-list)
       (let ((t1 (first-term term-list)))
         (cond ((= (order t1) 0) (adjoin-term (make-term 0 (add (coeff t1) int)) (attach-tag (type-tag term-list) (the-empty-termlist))))
-              ((empty-termlist? (rest-terms term-list)) (println "DEBUG\n") (adjoin-term t1 (adjoin-term (make-term 0 int) (attach-tag (type-tag term-list) (the-empty-termlist)))))
+              ((empty-termlist? (rest-terms term-list)) (adjoin-term t1 (adjoin-term (make-term 0 int) (attach-tag (type-tag term-list) (the-empty-termlist)))))
               (else (adjoin-term t1 (add-int-to-term-list (rest-terms term-list)))))))
-    (trace add-int-to-term-list)
     (make-poly (variable p) (add-int-to-term-list (term-list p))))
 
-  (trace add-poly-int)
-
-
   (define (mul-poly-int p int)
-    ;; 
-    1)
+    ;; multiply each term in p's term-list by int
+    (define (multiply-term-list term-list)
+      (if (empty-termlist? term-list)
+        (attach-tag (type-tag term-list) (the-empty-termlist))
+        (let* ((t1 (first-term term-list)))
+          (adjoin-term (make-term (order t1) (mul (coeff t1) int)) (multiply-term-list (rest-terms term-list))))))
+    (make-poly (variable p) (multiply-term-list (term-list p))))
 
   ;; generics
   (define (first-term term-list)
@@ -315,19 +311,10 @@
   (put 'negate '(polynomial) (lambda (x) (tag (negate-polynomial x))))
   (put 'sub '(polynomial polynomial) (lambda (x y) (tag (sub-poly x y))))
 
-  (trace add-terms)
-  ;; (trace mul-terms)
-  ;; (trace rest-terms)
-  ;; (trace sub-terms)
-  ;; (trace mul-term-by-all-terms)
-  ;; (trace adjoin-term)
-  ;; (trace apply-generic)
-  ;; (trace empty-termlist?)
-  ;; (trace div-terms)
   (put 'add '(polynomial integer) (lambda (x y) (tag (add-poly-int x y))))
   (put 'add '(integer polynomial) (lambda (x y) (tag (add-poly-int y x))))
-  (put 'mul '(polynomial integer) mul-poly-int)
-  (put 'mul '(integer polynomial) (lambda (x y) (mul-poly-int y x)))
+  (put 'mul '(polynomial integer) (lambda (x y) (tag (mul-poly-int x y))))
+  (put 'mul '(integer polynomial) (lambda (x y) (tag (mul-poly-int y x))))
 
   'done)
 
