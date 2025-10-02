@@ -6,25 +6,13 @@
   (install-raise-package)
   (install-project-package)
   (install-polynomial-package)
-  (define p1 (make-polynomial 'x (make-sparse-term-list '((2 1) (1 -2) (0 1)))))
-  (define p2 (make-polynomial 'x (make-sparse-term-list '((11 2) (0 7)))))
-  (define p3 (make-polynomial 'x (make-sparse-term-list '((13 1) (0 5)))))
-  (define Q1 (mul p1 p2))
-  (define Q2 (mul p1 p3))
-  (define e1 (make-polynomial 'x (make-sparse-term-list '((3 3) (2 2) (1 1) (0 -1)))))
-  (define e2 (make-polynomial 'x (make-sparse-term-list '((3 12) (2 8) (1 4) (0 -4)))))
-  (define Q (make-polynomial 'x (make-sparse-term-list '((2 2) (1 1) (0 3)))))
-
-  ;; Example of pseudodivision
-  (println (mydiv e1 Q)) ;; Has rational coefficients
-  (println (mydiv e2 Q))  ;; Has integer coefficients
-
-  (newline)
-  (println p1)
-  (newline)
-
-  ;; Using it in action with gcd of polynomials from the previous exercise
-  (println (mygcd Q1 Q2)))
+  (define p1 (make-polynomial 'x (make-sparse-term-list '((1 1) (0 1)))))
+  (define p2 (make-polynomial 'x (make-sparse-term-list '((3 1) (0 -1)))))
+  (define p3 (make-polynomial 'x (make-sparse-term-list '((1 1)))))
+  (define p4 (make-polynomial 'x (make-sparse-term-list '((2 1) (0 -1)))))
+  (define rf1 (make-rational p1 p2))
+  (define rf2 (make-rational p3 p4))
+  (add rf1 rf2))
 
 (define exact inexact->exact)
 
@@ -84,6 +72,9 @@
 (define (mygcd x y)
   (apply-generic 'gcd x y))
 
+(define (reduce x y)
+  (apply-generic 'reduce x y))
+
 ;; --- NUMBER TYPE PACKAGES ---
 
 ;; POLYNOMIALS
@@ -125,6 +116,7 @@
 (define (install-polynomial-package)
   (install-dense-term-list-package)
   (install-sparse-term-list-package)
+  (define (tag p) (attach-tag 'polynomial p))
   (define (make-poly variable term-list) (cons variable term-list))
   (define (variable p) (car p))
   (define (term-list p) (cdr p))
@@ -237,7 +229,7 @@
       (let* ((quotient-remainder-term-lists (div-terms (term-list p1) (term-list p2)))
              (quotient-term-list (car quotient-remainder-term-lists))
              (remainder-term-list (cadr quotient-remainder-term-lists)))
-        (list (make-poly (variable p1) quotient-term-list) (make-poly (variable p1) remainder-term-list)))
+        (list (tag (make-poly (variable p1) quotient-term-list)) (tag (make-poly (variable p1) remainder-term-list))))
       (error "Polys not in same var: DIV-POLY" (list p1 p2))))
 
   (define (remainder-terms L1 L2)
@@ -271,10 +263,10 @@
 
   (define (pseudoremainder-terms L1 L2)
     (let* ((O1 (order (first-term L1)))
-          (O2 (order (first-term L2)))
-          (C  (coeff (first-term L2)))
-          (power (sub (add 1 O1) O2))
-          (integerizing-factor (myexpt C power)))
+           (O2 (order (first-term L2)))
+           (C  (coeff (first-term L2)))
+           (power (sub (add 1 O1) O2))
+           (integerizing-factor (myexpt C power)))
       (remainder-terms (mul-term-by-all-terms (make-term 0 integerizing-factor) L1) L2)))
 
   (define (div-terms L1 L2)
@@ -318,13 +310,16 @@
 
   (define (reduce-poly p1 p2)
     (if (same-variable? (variable p1) (variable p2))
-      (list (make-poly (variable p1) (reduce-terms (term-list p1)))
-            (make-poly (variable p1) (reduce-terms (term-list p2))))
+      (let ((t (reduce-terms (term-list p1) (term-list p2))))
+        (list (tag (make-poly (variable p1) (car t)))
+              (tag (make-poly (variable p1) (cadr t)))))
       (error "Polys not in same var: GCD-POLY" (list p1 p2))))
 
   ;; returns nn and dd where each are n and d whose coefficients have been reduced using mygcd
   (define (reduce-terms n d)
-    (list (apply-gcd-to-coefficients n) (apply-gcd-to-coefficients d)))
+    (let ((g (gcd-terms n d)))
+      ;; NOTE: grabbing car of result as this division shouldn't have a remainder (will be the-empty-termlist as remainder)
+      (list (car (div-terms n g)) (car (div-terms d g)))))
 
   ;; generics
   (define (first-term term-list)
@@ -347,7 +342,6 @@
   (define (coeff term) (cadr term))
   (define (the-empty-termlist) '())
   (define (make-term order coeff) (list order coeff))
-  (define (tag p) (attach-tag 'polynomial p))
 
   ;; interface to the rest of the system
   (put 'add '(polynomial polynomial)
@@ -367,6 +361,7 @@
   (put 'mul '(polynomial integer) (lambda (x y) (tag (mul-poly-int x y))))
   (put 'mul '(integer polynomial) (lambda (x y) (tag (mul-poly-int y x))))
   (put 'gcd '(polynomial polynomial) (lambda (x y) (tag (gcd-poly x y))))
+  (put 'reduce '(polynomial polynomial) (lambda (x y) (reduce-poly x y)))
   'done)
 
 
@@ -378,6 +373,9 @@
   (define (tag x) (attach-tag 'integer x))
   (define (add-integer x y) (tag (+ x y)))
   (define (negate-integer x) (tag (* x -1)))
+  (define (reduce-integers n d)
+    (let ((g (gcd n d)))
+      (list (/ n g) (/ d g))))
   (put 'add '(integer integer) add-integer)
   (put 'sub '(integer integer) (lambda (x y) (tag (- x y))))
   (put 'mul '(integer integer) (lambda (x y) (tag (* x y))))
@@ -394,7 +392,8 @@
   (put 'lt '(integer integer) (lambda (x y) (< x y)))
   (put 'gt '(integer integer) (lambda (x y) (> x y)))
   (put 'gcd '(integer integer) (lambda (x y) (tag (gcd x y))))
-  (put 'expt '(integer integer) (lambda (x y) (tag (expt x y)))))
+  (put 'expt '(integer integer) (lambda (x y) (tag (expt x y))))
+  (put 'reduce '(integer integer) (lambda (x y) (tag (reduce-integers x y)))))
 
 
 ;; RATIONAL
@@ -404,12 +403,13 @@
   (define (numer x) (car x))
   (define (denom x) (cdr x))
   (define (make-rat n d)
-    (let ((g (mygcd n d)))
-      (cons (mydiv n g) (mydiv d g))))
+    (let ((r (reduce n d)))
+      (cons (car r) (cadr r))))
   (define (add-rat x y)
     (make-rat (add (mul (numer x) (denom y))
                    (mul (numer y) (denom x)))
               (mul (denom x) (denom y))))
+
   (define (sub-rat x y)
     (make-rat (sub (mul (numer x) (denom y))
                    (mul (numer y) (denom x)))
@@ -633,7 +633,8 @@
              (not (equal? op 'equ?))
              (not (equal? op '=zero?))
              (not (equal? op 'gt))
-             (not (equal? op 'lt)))
+             (not (equal? op 'lt))
+             (not (equal? op 'reduce)))
       (mydrop (apply proc (map contents args)))
       (apply proc (map contents args))))
 
