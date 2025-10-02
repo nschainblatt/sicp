@@ -242,8 +242,8 @@
 
   (define (gcd-terms a b)
     (if (empty-termlist? b)
-      a
-      (apply-gcd-to-coefficients (gcd-terms b (pseudoremainder-terms a b)))))
+      (apply-gcd-to-coefficients a)
+      (gcd-terms b (pseudoremainder-terms a b))))
 
   (define (apply-gcd-to-coefficients term-list)
     (if (empty-termlist? term-list)
