@@ -5,9 +5,11 @@
   (println (+ (fr 1) (fr 0)))) ;; 1
 
 (define (make-f)
-  (let ((state '()))
-    (define (f x)
-      (if (null? state)
-        (begin (set! state x) 0)
-        state))
+  (let ((state 0))
+    ;; f always returns the previous state.
+    (define (f new-state)
+      (let ((old-state state))
+        (set! state new-state)
+        old-state
+        ))
     f))
