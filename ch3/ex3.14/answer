@@ -1,0 +1,4 @@
+The value of W will be a list whose value is the reversed order of V.
+
+The new value of V will be '(a), it got set in the initial call to loop while the x passed in was the original refernce
+to x, causing it to be updated.
