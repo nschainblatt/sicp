@@ -1,34 +1,58 @@
 (define (main)
   (newline)
-  (define q1 (make-queue))
-  (println (q1 'empty?))  ; #t
-  (q1 'print)             ; '()
-  ((q1 'insert-front) 'a)
-  (q1 'print)             ; a
-  ((q1 'insert-front) 'b)
-  (q1 'print)             ; ba
-  ((q1 'insert-front) 'b)
-  (q1 'print)             ; bba
-  ((q1 'insert-front) 'c)
-  (q1 'print)             ; cbba
-  ((q1 'insert-rear) 'z)
-  (q1 'print)             ; cbbaz
-  (println (q1 'front))   ; c
-  (println (q1 'rear))    ; z
-  (q1 'delete-front)
-  (q1 'print)             ; bbaz
-  (q1 'delete-front)
-  (q1 'print)             ; baz
-  (q1 'delete-front)
-  (q1 'print)             ; az
-  (q1 'delete-rear)
-  (q1 'print)             ; a
-  (q1 'delete-rear)
-  (q1 'print)             ; '()
-  (println (q1 'empty?))  ; #t
+  (define q1 (make-deque))
+  (println (empty-deque? q1))  ; #t
+  (print-deque q1)             ; '()
+  (front-insert-deque! q1 'a)
+  (print-deque q1)             ; a
+  (front-insert-deque! q1 'b)
+  (print-deque q1)             ; ba
+  (front-insert-deque! q1 'b)
+  (print-deque q1)             ; bba
+  (front-insert-deque! q1 'c)
+  (print-deque q1)             ; cbba
+  (rear-insert-deque! q1 'z)
+  (print-deque q1)             ; cbbaz
+  (println (front-deque q1))   ; c
+  (println (rear-deque q1))    ; z
+  (front-delete-deque! q1)
+  (print-deque q1)             ; bbaz
+  (front-delete-deque! q1)
+  (print-deque q1)             ; baz
+  (front-delete-deque! q1)
+  (print-deque q1)             ; az
+  (rear-delete-deque! q1)
+  (print-deque q1)             ; a
+  (rear-delete-deque! q1)
+  (print-deque q1)             ; '()
+  (println (empty-deque? q1))  ; #t
   'done)
 
-(define (make-queue)
+(define (empty-deque? q)
+  (q 'empty?))
+
+(define (front-deque q)
+  (q 'front))
+
+(define (rear-deque q)
+  (q 'rear))
+
+(define (front-insert-deque! q x)
+  ((q 'insert-front) x))
+
+(define (rear-insert-deque! q x)
+  ((q 'insert-rear) x))
+
+(define (front-delete-deque! q)
+  (q 'delete-front))
+
+(define (rear-delete-deque! q)
+  (q 'delete-rear))
+
+(define (print-deque q)
+  (q 'print))
+
+(define (make-deque)
   (let ((front-ptr '())
 	(rear-ptr '()))
 
@@ -77,7 +101,7 @@
 	(set-rear! new-node)))
 
     (define (delete-front!)
-      (cond ((empty?) (error "Queue is empty, cannot delete any items"))
+      (cond ((empty?) (error "Deque is empty, cannot delete any items"))
 	    ((eq? (node-next front-ptr) rear-ptr) (set-front! rear-ptr))
 	    ((eq? front-ptr rear-ptr) (set-front! '()) (set-rear! '()))
 	    (else
@@ -89,7 +113,7 @@
 	      (set-front! (node-next front-ptr)))))
 
     (define (delete-rear!)
-      (cond ((empty?) (error "Queue is empty, cannot delete any items"))
+      (cond ((empty?) (error "Deque is empty, cannot delete any items"))
 	    ((eq? (node-next front-ptr) rear-ptr) (set-rear! front-ptr))
 	    ((eq? front-ptr rear-ptr) (set-front! '()) (set-rear! '()))
 	    (else
@@ -115,12 +139,12 @@
 
     (define (front)
       (if (empty?)
-	(error "Queue is empty, cannot retrieve any items")
+	(error "Deque is empty, cannot retrieve any items")
 	(node-value front-ptr)))
 
     (define (rear)
       (if (empty?)
-	(error "Queue is empty, cannot retrieve any items")
+	(error "Deque is empty, cannot retrieve any items")
 	(node-value rear-ptr)))
 
     (define (dispatch m)
