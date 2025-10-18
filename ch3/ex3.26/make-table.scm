@@ -60,6 +60,13 @@
   ((table 'lookup) keys))
 
 (define (make-table same-key?)
+
+  (define (make-record key value) (cons key value))
+  (define (record-key record) (car record))
+  (define (record-value record) (cdr record))
+  (define (set-record-key! record key) (set-car! record key))
+  (define (set-record-value! record value) (set-cdr! record value))
+
   (let ((table (list '*table*)))
 
     ;; Note that an unexpected error could happen if keys were given in the wrong order, such as if you gave 3 keys, and the middle
