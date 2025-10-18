@@ -3,6 +3,7 @@
 ;;    - We will need a representation for a tree as well as selectors and a constructor.
 ;;    - We will need a procedure to create a tree from a list, to then use a procedure to turn a list into a balanced tree.
 ;; 2. Update insert! to insert the keys in order from smallest to biggest (numerically or string comparison).
+;;    - Whenever we create a new table, we need to create a binary tree instead of just a list.
 ;;    - Update the iter inside of insert! to traverse the binary tree and sub-table trees.
 ;;    - Update the insert-remaining-keys procedure to insert the remining keys as additional sub-tables in binary tree
 ;;      representation.
@@ -21,12 +22,35 @@
 
 (define (main)
   (define table (make-table equal?))
-  (define tree (make-tree 2 '() '() (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))))
-  ((tree 'set-left-branch!) (make-tree 1 '() '() (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))))
-  ((tree 'set-right-branch!) (make-tree 4 (make-tree 3 '() '() (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))) (make-tree 5 '() '() (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))) (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))))
-  (tree 'print)
-  (newline)
-  (println ((tree 'lookup) 5)) ;; #t
+
+  ((table 'insert) (list 1 1) 'x1)
+  (table 'print)
+  ((table 'insert) (list 1 2) 'x2)
+  (table 'print)
+  ((table 'insert) (list 1 3) 'x3)
+  (table 'print)
+
+  ((table 'insert) (list 2 1) 'y1)
+  (table 'print)
+  ((table 'insert) (list 2 2) 'y2)
+  ((table 'insert) (list 2 3) 'y3)
+
+  ((table 'insert) (list 3 1) 'z1)
+  ((table 'insert) (list 3 2) 'z2)
+  ((table 'insert) (list 3 3) 'z3)
+
+  ((table 'insert) (list 1 1) 'x1.1)
+  ((table 'insert) (list 2 2) 'y2.2)
+  ((table 'insert) (list 3 3) 'z3.3)
+
+  (table 'print)
+
+  ((table 'insert) (list 10 9 8 7 6 5 4 3 2 1) 'TEST)
+  ((table 'insert) (list 10 9 8 7 6 5 4 3 2 1) 'TESTAGAIN)
+
+  (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2 1)))
+  (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2)))
+
   'done)
 
 (define (insert! keys value table)
