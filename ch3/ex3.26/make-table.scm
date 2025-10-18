@@ -17,14 +17,16 @@
 ;;    - If we make it through all the keys, simply update the final nodes value to the new value to insert.
 
 ;; NOTE: new lookup flow:
-;; 1. 
+;; 1. TODO:
 
 (define (main)
   (define table (make-table equal?))
-  (define tree (make-tree 2 '() '()))
-  ((tree 'set-left-branch!) (make-tree 1 '() '()))
-  ((tree 'set-right-branch!) (make-tree 3 '() '()))
+  (define tree (make-tree 2 '() '() (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))))
+  ((tree 'set-left-branch!) (make-tree 1 '() '() (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))))
+  ((tree 'set-right-branch!) (make-tree 4 (make-tree 3 '() '() (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))) (make-tree 5 '() '() (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))) (lambda (x y) (= x y)) (lambda (x y) (> x y)) (lambda (x y) (< x y))))
   (tree 'print)
+  (newline)
+  (println ((tree 'lookup) 5)) ;; #t
   'done)
 
 (define (insert! keys value table)
@@ -101,7 +103,7 @@
 (define (println x)
   (display x) (newline))
 
-(define (make-tree entry left right)
+(define (make-tree entry left right same-entry? greater-than-entry? lesser-than-entry?)
   (let ((tree (cons entry (cons left right))))
     (define (entry) (car tree))
     (define (left-branch) (cadr tree))
@@ -110,6 +112,19 @@
       (set-car! (cdr tree) value))
     (define (set-right-branch! value)
       (set-cdr! (cdr tree) value))
+ 
+    ;; NOTE: only works with binary trees (balanced or unbalanced, preferably balanced for best performance)
+    (define (lookup target-entry)
+      (cond ((same-entry? target-entry (entry)) #t)
+	    ((and (greater-than-entry? target-entry (entry)) (not (null? (right-branch)))) (((right-branch) 'lookup) target-entry))
+	    ((and (lesser-than-entry? target-entry (entry)) (not (null? (left-branch)))) (((left-branch) 'lookup) target-entry))
+	    (else #f)))
+
+    ;; (trace same-entry?)
+    ;; (trace greater-than-entry?)
+    ;; (trace lesser-than-entry?)
+
+
     ;; Prints in ascending order if the the tree is binary.
     (define (print tree)
       (if (or (null? tree))
@@ -130,7 +145,9 @@
 	    ((eq? m 'rigth-branch) (right-branch))
 	    ((eq? m 'set-left-branch!) set-left-branch!)
 	    ((eq? m 'set-right-branch!) set-right-branch!)
-	    ((eq? m 'print) (print tree))))
+	    ((eq? m 'lookup) lookup)
+	    ((eq? m 'print) (print tree))
+	    (else (error "unknown operation TREE"))))
     dispatch))
 
 (main)
