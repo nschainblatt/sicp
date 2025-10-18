@@ -46,8 +46,10 @@
 
   (table 'print)
 
-  ; (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2 1)))
-  ; (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2)))
+  (newline)
+
+  (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2 1))) ;; 'TESTAGAIN
+  (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2)))   ;; 'TREE
 
   'done)
 
