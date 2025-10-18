@@ -66,6 +66,7 @@
   (define (record-value record) (cdr record))
   (define (set-record-key! record key) (set-car! record key))
   (define (set-record-value! record value) (set-cdr! record value))
+  (define (table? potential-table) (pair? (cdr potential-table)))
 
   (let ((table (list '*table*)))
 
@@ -78,7 +79,7 @@
 	(cond ((null? sub-keys) 'done) ;; This wouldn't happen unless sub-keys was originally null passed in
 	      ((null? (cdr sub-keys))
 	       ;; car is the last key, so set to the new record instead of a table.
-	       (set-cdr! prev-table (cons (cons (car sub-keys) value) (cdr prev-table)))
+	       (set-cdr! prev-table (cons (make-record (car sub-keys) value) (cdr prev-table)))
 	       'done)
 	      (else
 		;; Insert a new table, and proceed to the next key
@@ -89,7 +90,7 @@
       (define (iter sub-keys sub-table)
 	(cond ((null? sub-keys)
 	       ;; Ran out of keys, which means we've reached our target record. Sub table is the record since assoc returns the car of the pair which is the record instead of another table here.
-	       (set-cdr! sub-table value))
+	       (set-record-value! sub-table value))
 	      ;; More keys and table to traverse
 	      (else
 		(let ((next-table (myassoc (car sub-keys) (cdr sub-table))))
@@ -103,7 +104,7 @@
     (define (lookup keys)
       (define (iter sub-keys sub-table)
 	(if (null? sub-keys)
-	  (if (pair? (cdr sub-table)) sub-table (cdr sub-table))
+	  (if (table? sub-table) sub-table (record-value sub-table))
 	  (let ((next-item (myassoc (car sub-keys) (cdr sub-table))))
 	    (if next-item
 	      (iter (cdr sub-keys) next-item)
