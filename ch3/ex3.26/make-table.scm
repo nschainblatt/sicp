@@ -1,26 +1,6 @@
 ;; TODO:
-;; 1. Update the table and sub-table representation to be a binary tree instead of just a list of records.
-;;    - We will need a representation for a tree as well as selectors and a constructor.
-;;    - We will need a procedure to create a tree from a list, to then use a procedure to turn a list into a balanced tree.
-;;        - This is so we can keep a balanced tree for maximum performance, we can rebalance the tree using an internal counter,
-;;          that tracks the number of inserts! made.
-;; 2. Update insert! to insert the keys in order from smallest to biggest (numerically or string comparison).
-;;    - Whenever we create a new table, we need to create a binary tree instead of just a list.
-;;    - Update the iter inside of insert! to traverse the binary tree and sub-table trees.
-;;    - Update the insert-remaining-keys procedure to insert the remining keys as additional sub-tables in binary tree
-;;      representation.
-;; 3. Update lookup to perform a binary tree search for the value under the keys given.
-;;    - Create a new iter inside of lookup to traverse each tree and sub-tree of the subsequent tables.
-
-
-;; NOTE: new insert! flow:
-;; 1. Traverse the main tables contents (is a tree) looking for the next key in keys, going through all the keys until the end.
-;;    - If along the way we don't find a node in the current sub-tree to continue searching through, we must create new sub-tables
-;;      as tree nested all the way down until the final node we create that will hold the value to insert.
-;;    - If we make it through all the keys, simply update the final nodes value to the new value to insert.
-
-;; NOTE: new lookup flow:
-;; 1. TODO:
+;; 1. Implement procedures to balance every tree after 5 inserts.
+;; 1. Refactor.
 
 (define (main)
   (define table (make-table equal?))
