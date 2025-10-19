@@ -49,8 +49,14 @@
   (insert-tree! tree (make-record 4 4))
   (insert-tree! tree (make-record 1 1))
 
-  (tree 'print)
   (println (tree 'tree->list))
+  (tree 'print)
+
+  (newline)
+  (tree 'balance!)
+
+  (println (tree 'tree->list))
+  (tree 'print)
 
   'done)
 
@@ -167,7 +173,9 @@
   (display x) (newline))
 
 (define (make-tree entry left right same-entry? greater-than-entry? lesser-than-entry?)
-  (let ((tree (cons entry (cons left right))))
+  (define (make-tree-internal entry left right)
+    (cons entry (cons left right)))
+  (let ((tree (make-tree-internal entry left right)))
     (define (entry) (car tree))
     (define (left-branch) (cadr tree))
     (define (right-branch) (cddr tree))
@@ -199,16 +207,22 @@
       (let ((left (left-branch))
 	    (right (right-branch))
 	    (entry (entry)))
-	(cond ((and (null? left) (null? right)) entry)
-	      ((null? left) (cons entry (cons (right 'tree->list) '())))
-	      ((null? right) (cons entry (cons (left 'tree->list) '())))
-	      (else (cons (right 'tree->list) (cons entry (left 'tree->list)))))))
+	(cond ((and (null? left) (null? right)) (cons entry '()))
+	      ((null? left) (cons entry (right 'tree->list)))
+	      ((null? right) (cons entry (left 'tree->list)))
+	      (else (append (right 'tree->list) (list entry) (left 'tree->list))))))
 
-    (define (list->tree)
-      'done)
+    (define (list->tree ordered-list)
+      (define (iter sub-list sub-tree)
+	(if (null? sub-list)
+	  sub-tree
+	  (begin ((sub-tree 'insert!) (car sub-list)) (iter (cdr sub-list) sub-tree))))
+      (if (null? ordered-list)
+	(error "list cannot be null LIST->TREE")
+	(iter (cdr ordered-list) (make-tree (car ordered-list) '() '() same-entry? greater-than-entry? lesser-than-entry?))))
 
-    (define (balance-tree)
-      (set! tree (list->tree (tree->list tree))))
+    (define (balance!)
+      (set! tree ((list->tree (tree->list)) 'get-tree)))
 
     ;; Prints in ascending order if the the tree is binary.
     (define (print)
@@ -237,7 +251,10 @@
 	    ((eq? m 'insert!) insert!)
 	    ((eq? m 'print) (print))
 	    ((eq? m 'tree->list) (tree->list))
-	    (else (error "unknown operation TREE"))))
+	    ((eq? m 'list->tree) list->tree)
+	    ((eq? m 'balance!) (balance!))
+	    ((eq? m 'get-tree) tree)
+	    (else (error "unknown operation TREE" m))))
     dispatch))
 
 (define tree? procedure?)
