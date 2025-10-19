@@ -1,6 +1,15 @@
 ;; TODO:
-;; 1. Implement procedures to balance every tree after 5 inserts.
+;; 1. Implement procedures to balance every tree and sub-tree after 5 inserts.
+;;	- Need a insert counter
+;;	- Need a procedure to convert all a tree into a list
+;;      - Need a procedure to convert a list into a balanced binary tree
+;;         - Will need a procedures for extraction and comparison
+;;      - Need a procedure to balance the entire table using the above procedures
+;;	   - Will traverse the table balancing all trees
 ;; 1. Refactor.
+;;      - Abstraction barriers
+;;      - Naming
+;;      - Comments to explain how a variable may be of one state or another based on condition (whether prev table is a record or tree or table)
 
 (define (main)
   (define table (make-table equal?))
@@ -24,14 +33,29 @@
   ((table 'insert) (list 10 9 8 7 6 5 4 3 2 1) 'TEST)
   ((table 'insert) (list 10 9 8 7 6 5 4 3 2 1) 'TESTAGAIN)
 
-  (table 'print)
+  ; (table 'print)
+  ;
+  ; (newline)
 
-  (newline)
+  ; (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2 1))) ;; 'TESTAGAIN
+  ; (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2)))   ;; 'TREE
 
-  (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2 1))) ;; 'TESTAGAIN
-  (println ((table 'lookup) (list 10 9 8 7 6 5 4 3 2)))   ;; 'TREE
+  ; (println (((table 'lookup) (list 1)) 'tree->list))
+
+  (define tree (make-tree (make-record 5 5) '() '() same-entry? greater-than-entry? lesser-than-entry?))
+  (insert-tree! tree (make-record 3 3))
+  (insert-tree! tree (make-record 6 6))
+  (insert-tree! tree (make-record 2 2))
+  (insert-tree! tree (make-record 4 4))
+  (insert-tree! tree (make-record 1 1))
+
+  (tree 'print)
+  (println (tree 'tree->list))
 
   'done)
+
+(define (insert-tree! tree entry)
+  ((tree 'insert!) entry))
 
 (define (insert! keys value table)
   ((table 'insert) keys value))
@@ -39,25 +63,34 @@
 (define (lookup keys table)
   ((table 'lookup) keys))
 
+(define (make-record key value) (cons key value))
+(define (record-key record) (car record))
+(define (record-value record) (cdr record))
+(define (set-record-key! record key) (set-car! record key))
+(define (set-record-value! record value) (set-cdr! record value))
+
+(define (same-entry? key entry)
+  (equal? key (car entry)))
+
+(define (greater-than-entry? value entry)
+  (> value (car entry)))
+
+(define (lesser-than-entry? value entry)
+  (< value (car entry)))
+
 (define (make-table same-key?)
 
-  (define (make-record key value) (cons key value))
-  (define (record-key record) (car record))
-  (define (record-value record) (cdr record))
-  (define (set-record-key! record key) (set-car! record key))
-  (define (set-record-value! record value) (set-cdr! record value))
   (define (table? potential-table) (pair? (cdr potential-table)))
 
-  (define (same-entry? key entry)
-    (equal? key (car entry)))
 
-  (define (greater-than-entry? value entry)
-    (> value (car entry)))
+  (let ((table (list '*table*))
+	(insert-counter 0)
+	(insertion-threshold 5))
 
-  (define (lesser-than-entry? value entry)
-    (< value (car entry)))
-
-  (let ((table (list '*table*)))
+    (define (rebalance-table)
+      ;; TODO: iterate through the table, for each tree in the table rebalance it, continue for all paths in the table.
+      (set! insert-counter 0)
+      'done)
 
     ;; Note that an unexpected error could happen if keys were given in the wrong order, such as if you gave 3 keys, and the middle
     ;; key was to a record and not another sub-table.
@@ -91,7 +124,11 @@
 		    (iter (cdr sub-keys) next-table)
 		    (insert-remaining-keys sub-keys sub-table))))))
 
-      (iter keys table))
+      (iter keys table)
+      (set! insert-counter (+ insert-counter 1))
+      (if (> insert-counter insertion-threshold)
+	(rebalance-table)
+	'done))
 
     ;; Returns the value in a record or sub-table located at the keys path.
     (define (lookup keys)
@@ -156,6 +193,23 @@
 	    ((and (lesser-than-entry? target-entry (entry)) (not (null? (left-branch)))) (((left-branch) 'lookup) target-entry))
 	    (else #f)))
 
+    ;; Assumes binary tree
+    ;; Returns list represenation of tree
+    (define (tree->list)
+      (let ((left (left-branch))
+	    (right (right-branch))
+	    (entry (entry)))
+	(cond ((and (null? left) (null? right)) entry)
+	      ((null? left) (cons entry (cons (right 'tree->list) '())))
+	      ((null? right) (cons entry (cons (left 'tree->list) '())))
+	      (else (cons (right 'tree->list) (cons entry (left 'tree->list)))))))
+
+    (define (list->tree)
+      'done)
+
+    (define (balance-tree)
+      (set! tree (list->tree (tree->list tree))))
+
     ;; Prints in ascending order if the the tree is binary.
     (define (print)
       (if (or (null? tree))
@@ -182,6 +236,7 @@
 	    ((eq? m 'lookup) lookup)
 	    ((eq? m 'insert!) insert!)
 	    ((eq? m 'print) (print))
+	    ((eq? m 'tree->list) (tree->list))
 	    (else (error "unknown operation TREE"))))
     dispatch))
 
