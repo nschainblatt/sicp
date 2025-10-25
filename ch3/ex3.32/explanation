@@ -1,0 +1,24 @@
+It is critical for the procedures within a time-segments queue in the agenda to be executed in FIFO order.
+This is because the actions within wires should be executed in the order the wires were changed, not the opposite.
+If FIFO order isn't used, unexpected results will occur.
+
+AND-GATE Example with input wires A,B changing from 1,0 to 0,1 respectively:
+
+Two actions are created, one for each input wire signal change.
+When the wires change signal value, their stored actions are called, which are the and-action-procedures.
+These procedures call after-delay, which adds these procedures to be executed by the agenda.
+The agenda will call these procedures based on the queue order, which for this example is FIFO.
+
+With FIFO ordering, wire A's actions will be called because this wire was changed first. This calls the stored
+and-action-procedure with the new signal value of wire A which is now 1.
+The logical-and resolves to value 1, because wire B still has it's original signal value of 1.
+Then, when wire B turns to 1 afterward, it's and-action-procedure will be called with the new value of B, which is 1,
+and the current value of A, which is now 0. This final logical-and resolves to 0.
+
+If the ordering was LIFO, wire B's actions would be called first, which causes the stored and procedure in B's actions
+to be called, resolving to 1 because wire A is has it's original value of 1 still.
+Then the and-action-procedure stored in wire A's actions would run, evaluating to 0.
+
+You can see that FIFO and LIFO have opposite outcomes in this example.
+
+FIFO is important because the actions should be called in the order the wires were changed, not the opposite.
