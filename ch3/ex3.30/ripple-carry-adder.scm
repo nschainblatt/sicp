@@ -74,19 +74,21 @@
     (define (set-signal! new-value)
       (if (not (bit? new-value))
 	(error "Invalid value --SET-SIGNAL!")
-	(begin
-	  (set! signal new-value)
-	  ;; For some reason we must call all actions even if the new-value is the same as the previous value.
-	  ;; If we don't, then the sum and carry bits are not correct.
-	  (call-actions)
-	  'ok-set-signal!)))
+	(if (not (= new-value signal))
+	  (begin
+	    (set! signal new-value)
+	    ;; For some reason we must call all actions even if the new-value is the same as the previous value.
+	    ;; If we don't, then the sum and carry bits are not correct.
+	    (call-actions)
+	    'ok-set-signal!))))
     (define (call-actions)
       (for-each (lambda (action) (action)) actions))
     ;; Makes sure to add actions in order they were created
     (define (add-action! op)
       (if (null? actions)
 	(set! actions (cons op '()))
-	(set-cdr! actions (cons op '()))))
+	(set-cdr! actions (cons op '())))
+      (op))
     (define (dispatch m)
       (cond ((eq? m 'get-signal) signal)
 	    ((eq? m 'set-signal!) set-signal!)
