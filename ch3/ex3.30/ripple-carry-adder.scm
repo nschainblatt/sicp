@@ -28,7 +28,7 @@
 ;; 2 * (or-gate-delay + invert + and-gate) + or-gate
 ;;
 ;; Example 2: Assuming or-gate and and-gate have a different delay:
-;; 2 * ((or-gate-delay - and-gate-delay) + invert-delay + and-gate-delay) + or-gate-delay
+;; 2 * (max(or-gate-delay, and-gate-delay) + invert-delay + and-gate-delay) + or-gate-delay
 ;;
 ;; Example 3: No optimizations
 ;; 2 * (or-gate-delay + and-gate-delay + invert-delay + and-gate-delay) + or-gate-delay
