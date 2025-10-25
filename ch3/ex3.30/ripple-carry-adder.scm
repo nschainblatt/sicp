@@ -30,10 +30,16 @@
 ;; Example 2: Assuming or-gate and and-gate have a different delay:
 ;; 2 * ((or-gate-delay - and-gate-delay) + invert-delay + and-gate-delay) + or-gate-delay
 ;;
+;; Example 3: No optimizations
+;; 2 * (or-gate-delay + and-gate-delay + invert-delay + and-gate-delay) + or-gate-delay
+;;
 ;; You would then multiply the total delay (choose one of the examples) by the number of bits to get the total delay for the
 ;; ripple-carry-adder.
 ;;
-;;  TODO: print out the gate when it is ran to check your answer after.
+;; After checking my estimation against the total number of gates ran, the actual result is exaclty double my estimate.
+;; This is because in each and-gate, and or-gate, we add two actions for the two input wires (to rerun on change).
+;; In add-action! we invoke the action being added and add the action to the action list, so we essentially run two and-gates
+;; for every and-gate called.
 
 (define (main)
   (let ((An (list (make-wire 0) (make-wire 1) (make-wire 0)))
@@ -45,13 +51,20 @@
     (ripple-carry-adder An Bn Sn C)
 
     ;; not changing any values, just setting to same value to trigger adders.
-    (for-each (lambda (wire) (set-signal! wire (get-signal wire))) An)
-    (for-each (lambda (wire) (set-signal! wire (get-signal wire))) Bn)
+    ; (for-each (lambda (wire) (set-signal! wire (get-signal wire))) An)
+    ; (for-each (lambda (wire) (set-signal! wire (get-signal wire))) Bn)
 
     (display "SUM: ")
     (println (map (lambda (wire) (get-signal wire)) Sn))
     (display "CARRY BIT: ")
-    (println (get-signal C))))
+    (println (get-signal C))
+
+    (display "TOTAL AND-GATE COUNT:")
+    (println total-and-gate-count)
+    (display "TOTAL OR-GATE COUNT:")
+    (println total-or-gate-count)
+    (display "TOTAL INVERTER COUNT:")
+    (println total-inverter-count)))
 
 (define (ripple-carry-adder An Bn Sn C)
   (if (not (= (length An) (length Bn)))
@@ -119,6 +132,8 @@
 	    (call-actions)
 	    'ok-set-signal!))))
     (define (call-actions)
+      (if (not (null? actions))
+      (println "CALLING ACTIONS"))
       (for-each (lambda (action) (action)) actions))
     ;; Makes sure to add actions in order they were created
     (define (add-action! op)
@@ -137,8 +152,10 @@
 
 ;; --- GATE ---
 (define and-gate-delay 1)
+(define total-and-gate-count 0)
 (define (and-gate a1 a2 output)
   (define (and-action-procedure)
+    (set! total-and-gate-count (inc total-and-gate-count))
     (let ((new-value
 	    (logical-and (get-signal a1) (get-signal a2))))
       (after-delay and-gate-delay (lambda () (set-signal! output new-value)))))
@@ -151,8 +168,10 @@
     0))
 
 (define or-gate-delay 1)
+(define total-or-gate-count 0)
 (define (or-gate a1 a2 output)
   (define (or-action-procedure)
+    (set! total-or-gate-count (inc total-or-gate-count))
     (let ((new-value (logical-or (get-signal a1) (get-signal a2))))
       (after-delay or-gate-delay (lambda () (set-signal! output new-value)))))
   (add-action! a1 or-action-procedure)
@@ -165,8 +184,10 @@
     0))
 
 (define inverter-delay 1)
+(define total-inverter-count 0)
 (define (inverter a output)
   (define (inverter-action-procedure)
+    (set! total-inverter-count (inc total-inverter-count))
     (let ((new-value (logical-inverter (get-signal a))))
       (after-delay inverter-delay (lambda () (set-signal! output new-value)))))
   (add-action! a inverter-action-procedure)
@@ -187,5 +208,8 @@
 
 (define (println x)
   (display x) (newline))
+
+(define (inc x)
+  (+ x 1))
 
 (main)
