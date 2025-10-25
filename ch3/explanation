@@ -1,0 +1,19 @@
+The initialization (calling actions when they are added, not just on signal change), is required to get the correct sum
+because during the initialization, an inversion is called on the c wire (carry), which in turn causes the output
+wire e to turn to 1. Then after that, the set-signal! on input-1 is called changing it to 1, and calling all actions
+on the input-1 wire. This causes a chain of actions to happen in this order:
+1. An OR between wires a and b with the output wire d is called that changes wire d's signal to 1.
+2. This change on wire d causes the AND between wires d and e to run, changing the s wire (sum) to 1, which is what we need
+	to get the correct answer.
+3. The last action to be ran due to the input-1 change is ran which is an AND between wires a and b with the output wire c (carry).
+	But no change is made due to the falsey AND.
+
+To summarize, in the initialization of the actions the carry bit is turned to 1, which allows a later AND operation to succeed
+which changes the sum bit to 1, giving us the correct answer.
+
+You could take this a step further and change both input-1 and input-2 wires to have values of 1, which would invoke the same
+actions above except there would be another AND that would occur after the one above between wires a and b (which map to input-1
+and input-2 wires) that would evaluate to 1, setting the carry bit to 1. Changing the carry bit would cause the prior INVERT
+to rerun, changing the value of wire e to 0. This change on e would cause the final AND to run again between d and e, which is
+falsey and turns the sum bit to 0. Leaving the sum to be 0 and the carry to be 1 which is the correct answer when adding bits
+1 and 1 together.
