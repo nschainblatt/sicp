@@ -1,3 +1,40 @@
+;; Delay needed for n-bit ripple carry adder:
+;;
+;; Since each bit in the list will be ran against a full-adder, and any actions attached to previous wires will be ran
+;; if those wires change value (note that with the adder, only output wires are written too, so this shouldn't happen),
+;; the delay sum is like this for one bit, so multiply by n:
+;;
+;; Individual delays without running any gates in parallel:
+;; 2 * half-adder + or-gate => 2 * (or-gate + and-gate + invert,and-gate) + or-gate
+;;
+;; Note that gates with no input wires are waiting on another gates output wires (no dependencies) can be ran at the same time.
+;; Same number means they can be ran at the same time:
+;; (or-gate a b d) ;;1
+;; (and-gate a b c);;1
+;; (inverter c e)  ;;2
+;; (and-gate d e s);;3
+;; ^ This is for one half-adder, note that there are two in a full-adder, one uses the output of the other so they are dependent
+;; and can't be ran at the same time (the second half-adder depends on the sum from the first ones output).
+;;
+;; Because of these dependencies the total delay would be the sum of two complete half-adders plus an additional or-gate-delay
+;; from the full-adder.
+;;
+;; The first or-gate and and-gate in each half-adder can be ran at the same time because they are independent.
+;; So assuming an or-gate and a and-gate have the same delay, we can remove one of the delays from the answer, otherwise
+;; you would have to include the difference.
+;;
+;; Example 1: Assuming or-gate and and-gate have same delay (same delay and they can be ran at the same time, so that
+;; delay is equal to one of them, I chose to keep or-gate-delay):
+;; 2 * (or-gate-delay + invert + and-gate) + or-gate
+;;
+;; Example 2: Assuming or-gate and and-gate have a different delay:
+;; 2 * ((or-gate-delay - and-gate-delay) + invert-delay + and-gate-delay) + or-gate-delay
+;;
+;; You would then multiply the total delay (choose one of the examples) by the number of bits to get the total delay for the
+;; ripple-carry-adder.
+;;
+;;  TODO: print out the gate when it is ran to check your answer after.
+
 (define (main)
   (let ((An (list (make-wire 0) (make-wire 1) (make-wire 0)))
 	(Bn (list (make-wire 1) (make-wire 1) (make-wire 1)))
@@ -52,10 +89,10 @@
 
 (define (half-adder a b s c)
   (let ((d (make-wire)) (e (make-wire)))
-    (or-gate a b d)
-    (and-gate a b c)
-    (inverter c e)
-    (and-gate d e s)
+    (or-gate a b d) ;;1
+    (and-gate a b c);;1
+    (inverter c e)  ;;2
+    (and-gate d e s);;3
     'ok-half-adder))
 
 ;; --- WIRE ---
