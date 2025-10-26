@@ -22,10 +22,8 @@
     z))
 
 (define (c- x y)
-  (let ((z (make-connector))
-        (tmp (make-connector)))
-    (set-value! tmp (- (get-value y)) 'c-)
-    (adder x tmp z)
+  (let ((z (make-connector)))
+    (adder y z x)
     z))
 
 (define (c* x y)
@@ -42,7 +40,7 @@
 
 (define (cv x)
   (let ((z (make-connector)))
-    (set-value! z x 'cv)
+    (constant x z)
     z))
 
 (define (celsius-fahrenheit-converter x)
