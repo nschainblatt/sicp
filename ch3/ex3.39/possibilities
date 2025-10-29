@@ -1,0 +1,12 @@
+101: P1 executes and sets x to 100 (10*10), then P2 executes and sets x to 101 (100+1).
+
+121: P2 executes and sets x to 11 (10+1), then P2 executes and sets x to 121 (11*11)
+
+11: P1 executes synchronized portion, returning 100, but doesn't set x to that value yet. Since P1 has finished
+    the synchronized portion P2 can begin. It accesses the original value of x which is still 10 and it's expression in the set
+    evaluates to 11, however, it doesn't set it yet either. P1 sets x to 100, but then P2 sets x to 11 right after.
+
+100: Same reason as '11', but P1 sets x to 100 after P2 sets x to 11.
+
+110: Not possible because the two x values accessed inside P1 would have to have different values, and since both the set!
+     within P2 and the access to x inside P1 is synchronized, it's not possible to reach this state.
