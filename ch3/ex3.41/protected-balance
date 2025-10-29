@@ -1,0 +1,25 @@
+Ben is incorrect that we need to protect the returned value of balance to the user of the account.
+
+This is because the only operations capable of modifying the internal value of the balance within the account are already
+protected using serialization.
+
+The only possible concern would be if someone was reading a value of balance during a deposit or withdraw, meaning the
+balance would be updated soon after reading.
+
+Seeing that the user has no ability to modify the balance with the read only value, there is no possible money loss for either
+the user of the bank.
+
+The only downside may be a slightly out of date balance, but this would be the case even if it was protected, you would read the
+value but then a withdraw could immediately update it afterwards leaving your value outdated since you've already accessed it
+using the protected lambda. You would have to re-request the balance from the bank, which you could do anyways with the unprotected
+method, having the same result.
+
+However, it could be useful because if you request the 'balance action on the dispatch procedure, you can't invoke the returned
+procedure until any withdraws or deposits have finished.
+You can also technically guarantee that no deposits or withdraws are allowed while your reading the balance but since that it
+just reading a variable that would take no time and the deposits and withdraws would resume soon after.
+
+However, seeing that this is a read-only value, it is not necessary to serialize it by wrapping it in a protected procedure,
+as soon as it is written to you would get the updated value if you were using the API properly.
+If you were building a program around the account, you would never request and store the balance in your own local state, you
+would always request the most up to date balance from the account whenever you needed it.
