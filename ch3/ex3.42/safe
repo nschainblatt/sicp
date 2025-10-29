@@ -1,0 +1,10 @@
+This is a safe change to make, and a more performant one since the only implementation of sets we have seen so far don't
+have instant lookup times. They have a lookup procedure in logarithmic time at best assuming the procedures in the set are sorted
+in some order, otherwise they have linear time complexity.
+
+We haven't seen the implementation of the make-serializer procedure yet, but we do know that it stores it's procedures in a
+set and returns a wrapper around the passed procedure for the serializer to monitor the concurrency of all procedures in the set.
+
+My understanding is that in the first example where we call protect on each call to 'deposit and 'withdraw, we are only adding
+the procedures to the set/system the first time around. Every invocation afterwards it doesn't add the procedures to the
+set/system because it invoked 'element-of-set?', returned true, and determined it was already being tracked.
