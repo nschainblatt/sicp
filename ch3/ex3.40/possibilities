@@ -1,0 +1,33 @@
+Part 1:
+
+1,000,000:
+	1. P1 executes first, followed by P2 (10 * 10 = 100; 100 * 100 * 100 = 1,000,000).
+	2. P2 executes first, followed by P1 (10 * 10 * 10 = 1,000; 1000 * 1000 = 1,000,000).
+
+100: P1 finishes set! expression but doesn't set yet, P2 updates x to 1000, finally P1 sets x to 100.
+
+1,000: Same as 100 but process order flipped.
+
+10,000:
+	1. P1 first access to x is the original value 10, but P2 updates x to 1000 before P1's second access to x. Then P1's set!
+	   expression is: 10 * 1000.
+	2. P2's first two accesses to x result in value 10, P1 executes setting x to 100, then the last access to x in P2 is 100,
+	   resulting in the expression: 10 * 10 * 100.
+
+100,000: P2 accesses it's first x at 10, then P1 updates x to 100, the rest of P2's x values are 100. Resulting expression in P2's
+         set! is 10 * 100 * 100.
+
+Note that it is not possible for the x's in P2 to have values in this order:
+1. 100 * 100 * 10
+2. 100 * 10 * 10
+
+This is because of the left to right evaluation of the scheme interpreter.
+If x has a value of 100, then all x's to the right must also be 100 since 100 is the most up to date value
+of x in P2.
+
+
+Part 2:
+
+1,000,000: This is the only possible result because only one process can run at a time. Different values of x in the same process
+           are no longer possible since both procedures are synchronized under the same serializer.
+
