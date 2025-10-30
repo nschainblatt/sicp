@@ -1,0 +1,15 @@
+1. The account balances after any number of concurrent exchanges with the first version of the 'exchange' procedure will still
+   end up being $10, $20, and $30 in some order. The only way that the set of account balances would remain 10, 20 and 30 would be if we executed the exchanges one at a time
+   with no overlap.
+
+2. Time diagram attachment
+
+3. The account balance sum of accounts 1, 2, and 3 would be preserved using the non-serialized version of exchange only if the
+   exchanges were executed one at a time, similar to the first question.
+
+4. Same time diagram attachment
+
+
+Note that the exchange and all withdraw and deposit procedures within each account involved in the exchange must be serialized
+to guarantee the integrity of all account balances involved. There can be no access to a account balance that is the middle of
+another transaction.
