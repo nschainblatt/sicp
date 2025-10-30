@@ -1,0 +1,9 @@
+Louis's reasoning is incorrect because the serialized-exchange procedure serializes the exchange procedure using both
+of the passed accounts serializers before immediately calling it.
+Within the exchange procedure that was called, both withdraw and deposit serialized procedures are called on the accounts,
+however, since the current procedure exchange hasn't finished executing, neither the deposit or withdraw procedures may execute
+since they are waiting on the serialized exchange procedure to finish. We have reached a deadlock, where two threads are
+waiting on the other to release the resource (what the serializer internally must be using to lock out the other threads).
+
+The reason why the original make-account-and-serializer worked with serialized-exchange is because serialized-exchange
+used the non-serialized versions of withdraw and deposit internally, so it never had to wait for the currently exchange to finish.
