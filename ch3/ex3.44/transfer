@@ -1,0 +1,10 @@
+Louis's reasoning is incorrect. The 'transfer' procedure does not need to be serialized like the 'exchange' procedure. This is
+because the 'exchange' procedure retrieves both account balances and performs the difference operation on it within the 'exchange'
+procedure. If the exchange wasn't serialized along with withdraw and deposit, the balance used in that operation could be out of
+date. All the 'transfer' procedure does it call the already serialized withdraw and deposit procedures. Any number of concurrent
+transfers could be ran with the same accounts and the result would always be the same, the integrity of all balances would remain.
+This is because of the serialized withdraw and deposit procedures that exist on the account level. If more than one 'transfer'
+happened on the same account, the internal withdraw procedures would only be allowed to execute one at a time due to serialization.
+The deposit procedure that happens on the other account involved in the transfer is completely independent and does not need to be
+serialized with the withdraw procedure of the other account since we are assuming that withdraw succeeded (The question mentions
+to assume the account has enough balance for the withdraw).
