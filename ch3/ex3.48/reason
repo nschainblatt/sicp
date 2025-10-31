@@ -1,0 +1,37 @@
+Giving each bank account a unique ID and then accessing the account in order of that ID solves the deadlock issue
+within the serialized-exchange procedure.
+
+This can be proven in the following examples:
+
+Original method (without ids and ordering):
+
+Peters access     -----     Pauls access
+exchange a1 -> a2           exchange a2 -> a1
+
+A deadlock will occur no matter which process starts first.
+For example, Peter accesses a1 while Paul accesses a2, assume Peter finishes first and tries to access
+a2. Peter will be blocked since Paul is still accessing a2. Paul finishes accessing a2
+and tries to move onto a1, Peter is still waiting and still has a hold of a1. They
+are both now waiting on each other, resulting in a deadlock.
+
+Since the accounts were sent to serialized-exchange in this order, and it is possible for two exchanges between the same accounts
+to happen concurrently, a deadlock is possible. Within serialized-exchange, both of the accounts serializers are wrapping the
+exchange procedure in the argument order of how the accounts were passed to the procedure. So for Peters case, when his exchange
+is executed, the a1's serializer will wrap the a2's serializer which wraps the exchange procedure. Finally the procedure returned
+is called, resulting in serializer1 to acquire the mutex first. However, before Peters exchange acquires serializer2's mutex, Pauls
+exchange begins and acquires the serializer2's mutex. Peter has serializer1 and Paul has serializer2 at the same time, Peter needs
+serializer2 next and Paul needs serializer1 next, this results in a deadlock because neither can proceed.
+
+You can see in the solution attached to this directory that the order of the way we call the serializers matters, as long as we
+call the serializer in the order of the account ID there will be no circular dependency.
+
+New method (with ids and ordering):
+
+Peters access     -----     Pauls access
+exchange a1 -> a2           before ordering: exchange a2 -> a1; after ordering: exchange a1 -> a2
+
+No deadlock occurs anymore because all of the accounts to be accessed will be done in ascending order.
+Assume Peter accesses a1 first (it doesn't matter who goes first), Paul will not be able to access a1 until Peter is finished.
+Peter finishes with a1 and moves on to a2, notice that he isn't blocked because Paul is still waiting on a1.
+Paul can enter a1 now that Peter is in a2. Paul finishes with a1 and is now waiting on Peter to finish with a2.
+Peter finishes, Paul enters a2 and also finishes.
