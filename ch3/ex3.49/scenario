@@ -1,0 +1,18 @@
+A scenario where the ordered account ID deadlock solution would not work is if the way the accounts are generating their unique
+IDs is not thread safe.
+
+If two distinct accounts were given the same account ID, this could cause the same deadlock issue from before to occur.
+
+For example:
+Given account a1 with id 1, and account a2 also with id 1, and two concurrent exchanges happening in the opposite direction:
+P1: exchange (a1 -> a2)
+P2: exchange (a2 -> a1)
+
+The serializers would always begin in the same order because the if condition would always evaluate to false (because lesser
+than fails due to having the same account id value).
+
+Since the only difference in the two exchanges is the order in the account arguments, this would make P1 acquire a2's
+serializer mutex first. Since we are assuming this is happening at the same time, P2 would acquire a1's serializer mutex
+since the account arguments are in the opposite order and the if condition also fails.
+Now P1 has a1's mutex, and P2 has a2's mutex, P1 now needs a2's mutex but has not released a1 yet and P2 needs that mutex to be 
+free in order to acquire it. This has resulted in a deadlock.
