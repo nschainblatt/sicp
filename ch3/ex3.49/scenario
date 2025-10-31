@@ -16,3 +16,14 @@ serializer mutex first. Since we are assuming this is happening at the same time
 since the account arguments are in the opposite order and the if condition also fails.
 Now P1 has a1's mutex, and P2 has a2's mutex, P1 now needs a2's mutex but has not released a1 yet and P2 needs that mutex to be 
 free in order to acquire it. This has resulted in a deadlock.
+
+
+Update:
+
+After reviewing, it sounds like the question is asking something along the lines of this:
+
+An exchange that must be locked before retrieving all necessary information from shared resources involved. Only then can the
+exchange proceed. This however leaves a door open for one of the shared resources to be locked already, forcing our exchange
+process to wait for the shared resource to be free. We are now dependent on that shared resource not encountering a deadlock,
+and if that shared resource is waiting on our exchange process to finish in order to release (which we've already locked)
+then we have created a deadlock.
