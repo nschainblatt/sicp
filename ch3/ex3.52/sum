@@ -1,0 +1,24 @@
+The sum is 210 after all expressions have been evaluated.
+Sum starts out at 0, reaches 1 after seq is defined.
+When y is defined, it has to load the seq stream until the first even number (value of sum) is found, which is 6.
+Sum is now 6, when z is defined, the seq stream is loaded until it's value of sum is divisible by 5, which is 15.
+Sum is now 15, when the 7th ref of y is accessed, we have to find 8 values of sum that are even (8 because the ref indexing is 0
+based, note that 6 was already found which is the first even number used). Those 8 even values in stream y are:
+6, 10, 28, 36, 66, 78, 120, and 136.
+Sum is now 136, when stream z is displayed, it evaluates the entire stream of seq all the way to the last interval value.
+Them sum ends up being 210 after all interval values have been accumulated.
+
+The displayed output to evaluating (stream-ref y 7) and (display-stream z):
+10
+15
+45
+55
+105
+120
+190
+210
+
+Notice they are all divisible by 5.
+
+The responses would differ if we used the delay implementation of lambdas without memoization because we would have to re-evaluate each stream-cdr when needed. This would result in the sum getting re-accumulated for that access. The sum would be much higher
+in this case.
