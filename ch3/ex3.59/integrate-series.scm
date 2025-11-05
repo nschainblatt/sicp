@@ -1,3 +1,8 @@
+(define (println x)
+  (newline) (display x))
+
+(println "\nPart a:")
+
 (define (integrate-series stream-a)
   (stream-map-with-index (lambda (index value) (* (/ 1 index) value)) stream-a))
 
@@ -16,8 +21,6 @@
 (define (print x)
   (display x) (display " "))
 
-(define (println x)
-  (newline) (display x))
 
 (define (stream-enumerate-interval low high)
   (if (> low high) '()
@@ -29,3 +32,27 @@
 (stream-for-each-until print s1 10)
 (newline)
 (stream-for-each-until print (integrate-series s1) 10)
+
+
+(println "\nPart b:")
+
+(define exp-series
+  (cons-stream 1 (integrate-series exp-series)))
+
+(define cosine-series
+  (cons-stream 1 (stream-map (lambda (x) (- x)) (integrate-series sine-series))))
+
+(define sine-series
+  (cons-stream 0 (integrate-series cosine-series)))
+
+(newline)
+(stream-for-each-until print exp-series 10)
+
+(newline)
+
+(println "cosine")
+(newline)
+(stream-for-each-until print cosine-series 20)
+(println "sine")
+(newline)
+(stream-for-each-until print sine-series 20)
