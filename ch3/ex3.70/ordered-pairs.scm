@@ -4,19 +4,13 @@
 	(else
 	  (let ((s1car (stream-car s1))
 		(s2car (stream-car s2)))
-	    (cond ((< (weight s1car) (weight s2car))
-		   (cons-stream
-		     s1car
-		     (merge-weighted (stream-cdr s1) s2 weight)))
-		  ((> (weight s1car) (weight s2car))
-		   (cons-stream
-		     s2car
-		     (merge-weighted s1 (stream-cdr s2) weight)))
-		  (else
-		    (cons-stream
-		      s1car
-		      (merge-weighted (stream-cdr s1)
-				      (stream-cdr s2) weight))))))))
+	    (if (<= (weight s1car) (weight s2car))
+	      (cons-stream
+		s1car
+		(merge-weighted (stream-cdr s1) s2 weight))
+	      (cons-stream
+		s2car
+		(merge-weighted s1 (stream-cdr s2) weight)))))))
 
 (define (pair-weight pair)
   (+ (car pair) (cadr pair)))
@@ -57,6 +51,9 @@
 (define (!= x y)
   (not (= x y)))
 
+(define (<= x y)
+  (or (= x y) (< x y)))
+
 (define (not-divisible-by-2-3-or-5 x)
   (and (!= (remainder x 2) 0)
        (!= (remainder x 3) 0)
@@ -70,8 +67,8 @@
 		  (lambda (pair) 
 		    (and (not-divisible-by-2-3-or-5 (car pair))
 			 (not-divisible-by-2-3-or-5 (cadr pair))))
-		    (weighted-pairs
-		      integers
-		      integers
-		      (lambda (pair) (+ (* 2 (car pair)) (* 3 (cadr pair) (* 5 (car pair) (cadr pair)))))))
-		  10)
+		  (weighted-pairs
+		    integers
+		    integers
+		    (lambda (pair) (+ (* 2 (car pair)) (* 3 (cadr pair) (* 5 (car pair) (cadr pair)))))))
+		10)
