@@ -77,9 +77,9 @@
 	    (third (stream-car (stream-cdr (stream-cdr pairs)))))
 
 	(if (= (square-sum-weight first) (square-sum-weight second) (square-sum-weight third))
-	  (cons-stream (list first second third) (sum-of-two-squares-filter (stream-cdr (stream-cdr (stream-cdr pairs)))))
+	  (cons-stream (list (square-sum-weight first) first second third) (sum-of-two-squares-filter (stream-cdr (stream-cdr (stream-cdr pairs)))))
 	  ;; Otherwise go to the next new three pairs.
-	  (sum-of-two-squares-filter (stream-cdr (stream-cdr (stream-cdr pairs))))))))
+	  (sum-of-two-squares-filter (stream-cdr pairs))))))
 
   (sum-of-two-squares-filter squared-sum-pairs))
 
