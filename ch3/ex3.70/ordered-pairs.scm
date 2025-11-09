@@ -54,21 +54,17 @@
 (define (<= x y)
   (or (= x y) (< x y)))
 
-(define (not-divisible-by-2-3-or-5 x)
-  (and (!= (remainder x 2) 0)
-       (!= (remainder x 3) 0)
-       (!= (remainder x 5) 0)))
+(define (divisible? x y)
+  (= (remainder x y) 0))
 
 ;; a.
 (print-n-stream (weighted-pairs integers integers pair-weight) 10)
 
 ;; b.
-(print-n-stream (stream-filter
-		  (lambda (pair) 
-		    (and (not-divisible-by-2-3-or-5 (car pair))
-			 (not-divisible-by-2-3-or-5 (cadr pair))))
-		  (weighted-pairs
-		    integers
-		    integers
-		    (lambda (pair) (+ (* 2 (car pair)) (* 3 (cadr pair) (* 5 (car pair) (cadr pair)))))))
-		10)
+(define filtered-integers (stream-filter (lambda (x) (not (or (divisible? x 2) (divisible? x 3) (divisible? x 5)))) integers))
+(print-n-stream 
+  (weighted-pairs
+    filtered-integers
+    filtered-integers
+    (lambda (pair) (+ (* 2 (car pair)) (* 3 (cadr pair)) (* 5 (car pair) (cadr pair)))))
+  10)
