@@ -63,7 +63,14 @@
 	 (list-of-values (cdr variables-values-pair))
 	 (Lambda (make-lambda variables (let-body exp))))
 
-    (cons Lambda list-of-values)))
+    (if (named-let? exp)
+      (let ((outer-lambda (make-lambda (list (let-name exp)) (cons Lambda list-of-values))))
+	;; This produces an outer-lambda that has a bound variable that is a lambda of the body of the original parameters and body.
+	;; When applied, it will immediately apply the original let body stored in the inner lambda. This inner lambda is given access
+	;; to itself via the outer-lambdas bound parameter. The inner lambda may recursively call itself this way without supplying a
+	;; new lambda definition because it is defined in the outer-lambdas scope.
+	(cons outer-lambda Lambda))
+      (cons Lambda list-of-values))))
 
 (define (make-lambda parameters body)
   (cons 'lambda (cons parameters body)))
@@ -84,7 +91,12 @@
 (newline)
 
 (define example-named-let-expression
-  (make-named-let 'test-proc (list '(x 1) '(y 2)) '(+ x y)))
+  (make-named-let
+    'fib-iter
+    '((a 1) (b 0) (count n))
+    '(if (= count 0)
+       b
+       (fib-iter (+ a b) a (- count 1)))))
 
 ;; #t
 (println (named-let? example-named-let-expression))
