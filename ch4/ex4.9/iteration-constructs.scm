@@ -70,19 +70,6 @@
 (define (while-initial-variables exp)
   (cadddr exp))
 
-; (define (while->combination exp)
-;   (let ((predicate (while-predicate exp))
-; 	(operation (while-operation exp))
-; 	(initial-variables (while-initial-variables exp)))
-;
-;     ;; error because iter isn't defined when it's used in the body
-;     (define iter (make-lambda '(changed-variables)
-; 			      (make-if (cons predicate '(changed-variables))
-; 				       (cons iter (cons operation '(changed-variables)))
-; 				       'done)))
-;     (cons iter initial-variables)))
-
-
 (define (do-while->combination exp)
   (let ((predicate (while-predicate exp))
 	(operation (while-operation exp))
@@ -108,14 +95,45 @@
 						(cons iter (cons operation (list changed-variables)))
 						'done)))))
 
+;; until is just the reverse of while, so can use same representation and simply invert the predicate.
+;; since we require a predicate, and the user would use until, they would have to define the predicate that is true when their
+;; state variable is false.
+(define (until->combination exp)
+  (while->combination exp))
+
+;; FOR
+(define (make-for initial predicate increment operation)
+  (cons 'for (list initial predicate increment operation)))
+(define (for-initial exp)
+  (cadr exp))
+(define (for-predicate exp)
+  (caddr exp))
+(define (for-increment exp)
+  (caddr exp))
+(define (for-operation exp)
+  (caddr exp))
+
+(define (for->combination exp)
+  (let ((initial (for-initial exp))
+	(predicate (for-predicate exp))
+	(increment (for-increment exp))
+	(operation (for-operation exp)))
+
+    ;; Creates and transforms a named let to repeatedly call it's body with the changed state until the predicate is false.
+    (let->combination (make-named-let 'iter
+				      (list (list 'i initial))
+				      '(make-if (cons predicate (list i))
+						(make-begin (list (cons operation i) (cons iter (+ i increment))))
+						'done)))))
+
 (define (main)
   (define example-operation (make-lambda '(x) '((+ x 1))))
   (println example-operation)
   (define example-predicate (make-lambda '(x) '((< x 10))))
   (println example-predicate)
-  (define example-while (make-while example-operation example-predicate 0))
-  (println example-while)
-  (println (do-while->combination example-while)))
+  (define example-for (make-for 0 example-predicate 1 example-operation))
+  (println example-for)
+  (println (for->combination example-for)))
 
 ;; Core
 (define (eval exp env)
