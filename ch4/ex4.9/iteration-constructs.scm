@@ -82,12 +82,24 @@
 ; 				       'done)))
 ;     (cons iter initial-variables)))
 
+
+(define (do-while->combination exp)
+  (let ((predicate (while-predicate exp))
+	(operation (while-operation exp))
+	(initial-variables (while-initial-variables exp)))
+
+    ;; Creates and transforms a named let to repeatedly call it's body with the changed state until the predicate is false.
+    (let->combination (make-named-let 'iter
+				      ;; call the operation once before the predicate
+				      (list (list 'changed-variables (cons operation (list initial-variables))))
+				      '(make-if (cons predicate (list changed-variables))
+						(cons iter (cons operation (list changed-variables)))
+						'done)))))
+
 (define (while->combination exp)
   (let ((predicate (while-predicate exp))
 	(operation (while-operation exp))
-	(initial-variables (while-initial-variables exp))
-	)
-
+	(initial-variables (while-initial-variables exp)))
 
     ;; Creates and transforms a named let to repeatedly call it's body with the changed state until the predicate is false.
     (let->combination (make-named-let 'iter
@@ -103,11 +115,7 @@
   (println example-predicate)
   (define example-while (make-while example-operation example-predicate 0))
   (println example-while)
-  (println (while->combination example-while)))
-
-
-
-
+  (println (do-while->combination example-while)))
 
 ;; Core
 (define (eval exp env)
