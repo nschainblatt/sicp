@@ -1,10 +1,15 @@
-;; Copy the books eval and apply and the rest of the procedures
+(define (main)
+  (install-eval-package)
+  (driver-loop))
 
-;; Create the data directed programming table, holding procudures with two key lookups (e.g. (get 'eval 'if))
+(define apply-in-underlying-scheme apply)
 
-;; Convert the books eval to use this table
+(define (println x)
+  (newline)
+  (display x))
 
 (define the-empty-table '(head))
+
 (define (make-table)
   (let ((table the-empty-table))
 
@@ -26,12 +31,11 @@
       (let ((type-result (scan type (cdr table))))
 	(if type-result
 	  (let ((proc-result (scan proc (cdr type-result))))
-	    (println proc-result)
 	    (if proc-result
 	      (set-cdr! proc-result operation)
 	      (set-cdr! type-result (cons (cons proc operation) (cdr type-result)))
 	      ))
-	    (set-cdr! table (cons (list type (cons proc operation)) (cdr table))))))
+	  (set-cdr! table (cons (list type (cons proc operation)) (cdr table))))))
 
     (define (print)
       (println table))
@@ -55,25 +59,42 @@
   ((eval-procedure-table 'print)))
 
 (define (eval exp env)
-  (cond ((self-evaluating? exp) exp)
-	((variable? exp) (lookup-variable-value exp env))
-	((quoted? exp) (text-of-quotation exp))
-	((assignment? exp) (eval-assignment exp env))
-	((definition? exp) (eval-definition exp env))
-	((if? exp) (eval-if exp env))
-	((lambda? exp) (make-procedure (lambda-parameters exp)
-				       (lambda-body exp)
-				       env))
-	((begin? exp)
-	 (eval-sequence (begin-actions exp) env))
-	((cond? exp) (eval (cond->if exp) env))
-	((application? exp)
-	 (apply (eval (operator exp) env)
-		(list-of-values (operands exp) env)))
-	(else
-	  (error "Unknown expression type: EVAL" exp))))
+  ; (println exp)
+  (let ((eval-handler (get 'eval (type-tag exp))))
+    (if eval-handler
+      (eval-handler exp env)
+      ((get 'eval 'call) exp env))))
 
+(define (type-tag exp)
+  (cond ((pair? exp) (car exp))
+	((boolean? exp) 'boolean)
+	((number? exp) 'number)
+	((string? exp) 'string)
+	((symbol? exp) 'symbol)
+	((null? exp) (error "invalid syntax null --type-tag"))
+	(else (error "unknown expression type --type-tag"))))
 
+(define contents cdr)
+
+(define false #f)
+(define true #t)
+(define (true? x) (not (eq? x false)))
+(define (false? x) (eq? x false))
+
+(define (install-eval-package)
+  (define (identity exp env) exp)
+  (put 'eval 'boolean identity)
+  (put 'eval 'number identity)
+  (put 'eval 'string identity)
+  (put 'eval 'symbol lookup-variable-value)
+  (put 'eval 'quote text-of-quotation)
+  (put 'eval 'set! eval-assignment)
+  (put 'eval 'define eval-definition)
+  (put 'eval 'if eval-if)
+  (put 'eval 'lambda (lambda (exp env) (make-procedure (lambda-parameters exp) (lambda-body exp) env)))
+  (put 'eval 'begin (lambda (exp env) (eval-sequence (begin-actions exp) env)))
+  (put 'eval 'cond (lambda (exp env) (eval (cond->if exp) env)))
+  (put 'eval 'call (lambda (exp env) (apply (eval (operator exp) env) (list-of-values (operands exp) env)))))
 
 (define (apply procedure arguments)
   (cond ((primitive-procedure? procedure)
@@ -89,6 +110,7 @@
 	  (error
 	    "Unknown procedure type: APPLY" procedure))))
 
+
 (define (list-of-values exps env)
   (if (no-operands? exps)
     '()
@@ -96,6 +118,7 @@
 	  (list-of-values (rest-operands exps) env))))
 
 (define (eval-if exp env)
+  ; (println "EVAL-IF")
   (if (true? (eval (if-predicate exp) env))
     (eval (if-consequent exp) env)
     (eval (if-alternative exp) env)))
@@ -114,6 +137,7 @@
   'ok)
 
 (define (eval-definition exp env)
+  ; (println "EVAL-DEFINITION")
   (define-variable! (definition-variable exp)
 		    (eval (definition-value exp) env)
 		    env)
@@ -127,7 +151,7 @@
 (define (variable? exp) (symbol? exp))
 
 (define (quoted? exp) (tagged-list? exp 'quote))
-(define (text-of-quotation exp) (cadr exp))
+(define (text-of-quotation exp env) (cadr exp))
 
 (define (tagged-list? exp tag)
   (if (pair? exp)
@@ -154,6 +178,7 @@
 (define (lambda-body exp) (cddr exp))
 
 (define (make-lambda parameters body)
+  ; (println "MAKE-LAMBDA")
   (cons 'lambda (cons parameters body)))
 
 (define (if? exp) (tagged-list? exp 'if))
@@ -190,7 +215,7 @@
 (define (cond? exp) (tagged-list? exp 'cond))
 (define (cond-clauses exp) (cdr exp))
 (define (cond-else-clause? clause)
-(eq? (cond-predicate clause) 'else))
+  (eq? (cond-predicate clause) 'else))
 (define (cond-predicate clause) (car clause))
 (define (cond-actions clause) (cdr clause))
 (define (cond->if exp) (expand-clauses (cond-clauses exp)))
@@ -208,6 +233,128 @@
 		 (sequence->exp (cond-actions first))
 		 (expand-clauses rest))))))
 
-(define (println x)
-  (newline)
-  (display x))
+(define (make-procedure parameters body env)
+  (list 'procedure parameters body env))
+(define (compound-procedure? p)
+  (tagged-list? p 'procedure))
+(define (procedure-parameters p) (cadr p))
+(define (procedure-body p) (caddr p))
+
+(define (procedure-environment p) (cadddr p))
+(define (enclosing-environment env) (cdr env))
+(define (first-frame env) (car env))
+(define the-empty-environment '())
+
+(define (make-frame variables values)
+  (cons variables values))
+(define (frame-variables frame) (car frame))
+(define (frame-values frame) (cdr frame))
+(define (add-binding-to-frame! var val frame)
+  (set-car! frame (cons var (car frame)))
+  (set-cdr! frame (cons val (cdr frame))))
+
+(define (extend-environment vars vals base-env)
+  (if (= (length vars) (length vals))
+    (cons (make-frame vars vals) base-env)
+    (if (< (length vars) (length vals))
+      (error "Too many arguments supplied" vars vals)
+      (error "Too few arguments supplied" vars vals))))
+
+(define (lookup-variable-value var env)
+  (define (env-loop env)
+    (define (scan vars vals)
+      (cond ((null? vars)
+	     (env-loop (enclosing-environment env)))
+	    ((eq? var (car vars)) (car vals))
+	    (else (scan (cdr vars) (cdr vals)))))
+    (if (eq? env the-empty-environment)
+      (error "Unbound variable" var)
+      (let ((frame (first-frame env)))
+	(scan (frame-variables frame)
+	      (frame-values frame)))))
+  (env-loop env))
+
+(define (set-variable-value! var val env)
+  (define (env-loop env)
+    (define (scan vars vals)
+      (cond ((null? vars)
+	     (env-loop (enclosing-environment env)))
+	    ((eq? var (car vars)) (set-car! vals val))
+	    (else (scan (cdr vars) (cdr vals)))))
+    (if (eq? env the-empty-environment)
+      (error "Unbound variable: SET!" var)
+      (let ((frame (first-frame env)))
+	(scan (frame-variables frame)
+	      (frame-values frame)))))
+  (env-loop env))
+
+(define (define-variable! var val env)
+  (let ((frame (first-frame env)))
+    (define (scan vars vals)
+      (cond ((null? vars)
+	     (add-binding-to-frame! var val frame))
+	    ((eq? var (car vars)) (set-car! vals val))
+	    (else (scan (cdr vars) (cdr vals)))))
+    (scan (frame-variables frame) (frame-values frame))))
+
+(define (setup-environment)
+  (let ((initial-env
+	  (extend-environment (primitive-procedure-names)
+			      (primitive-procedure-objects)
+			      the-empty-environment)))
+    (define-variable! 'true true initial-env)
+    (define-variable! 'false false initial-env)
+    initial-env))
+
+(define (primitive-procedure? proc)
+  (tagged-list? proc 'primitive))
+(define (primitive-implementation proc) (cadr proc))
+
+(define primitive-procedures
+  (list (list 'car car)
+	(list 'cdr cdr)
+	(list 'cons cons)
+	(list 'null? null?)
+	(list 'display display)
+	(list 'newline newline)
+	(list 'println println)
+	(list 'map map)
+	(list '* *)
+	;; ⟨more primitives⟩
+	))
+(define (primitive-procedure-names)
+  (map car primitive-procedures))
+(define (primitive-procedure-objects)
+  (map (lambda (proc) (list 'primitive (cadr proc)))
+       primitive-procedures))
+
+(define (apply-primitive-procedure proc args)
+  (apply-in-underlying-scheme
+    (primitive-implementation proc) args))
+
+(define input-prompt ";;; M-Eval input:")
+(define output-prompt ";;; M-Eval value:")
+
+(define (driver-loop)
+  (prompt-for-input input-prompt)
+  (let ((input (read)))
+    (let ((output (eval input the-global-environment)))
+      (announce-output output-prompt)
+      (user-print output)))
+  (driver-loop))
+
+(define (prompt-for-input string)
+  (newline) (newline) (display string) (newline))
+(define (announce-output string)
+  (newline) (display string) (newline))
+
+(define (user-print object)
+  (if (compound-procedure? object)
+    (display (list 'compound-procedure
+		   (procedure-parameters object)
+		   (procedure-body object)
+		   '<procedure-env>))
+    (display object)))
+
+(define the-global-environment (setup-environment))
+(main)
