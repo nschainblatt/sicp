@@ -94,7 +94,9 @@
   (put 'eval 'lambda (lambda (exp env) (make-procedure (lambda-parameters exp) (lambda-body exp) env)))
   (put 'eval 'begin (lambda (exp env) (eval-sequence (begin-actions exp) env)))
   (put 'eval 'cond (lambda (exp env) (eval (cond->if exp) env)))
-  (put 'eval 'call (lambda (exp env) (apply (eval (operator exp) env) (list-of-values (operands exp) env)))))
+  (put 'eval 'call (lambda (exp env) (apply (eval (operator exp) env) (list-of-values (operands exp) env))))
+  (put 'eval 'let (lambda (exp env) (eval (let->combination exp) env)))
+  )
 
 (define (apply procedure arguments)
   (cond ((primitive-procedure? procedure)
@@ -232,6 +234,48 @@
 	(make-if (cond-predicate first)
 		 (sequence->exp (cond-actions first))
 		 (expand-clauses rest))))))
+
+
+;; Let syntax
+;; (let ((x 1) . . . (⟨varn⟩ ⟨expn⟩))
+;;   ⟨body⟩)
+(define (let-assignments exp)
+  (cadr exp))
+(define (let-body exp)
+  (cddr exp))
+(define (let-first-assignment assignments)
+  (car assignments))
+(define (let-rest-assignments assignments)
+  (cdr assignments))
+(define (let-variable assignment)
+  (car assignment))
+(define (let-value assignment)
+  (cadr assignment))
+(define (empty-assignments? assignments)
+  (null? assignments))
+
+
+(define (let->combination exp)
+
+  ;; Returns a pair containing a car of variables and a cdr of assignments, in same order.
+  (define (let-assignments->variables-values-pair assignments)
+    (define (iter variables values sub-assignments)
+      (if (empty-assignments? sub-assignments)
+	(cons variables values)
+	(let* ((assignment (let-first-assignment sub-assignments))
+	       (variable (let-variable assignment))
+	       (value (let-value assignment)))
+	  (iter (append variables (list variable)) (append values (list value)) (let-rest-assignments sub-assignments)))))
+    (iter '() '() assignments))
+
+  (let* ((variables-values-pair (let-assignments->variables-values-pair (let-assignments exp)))
+	 (variables (car variables-values-pair))
+	 (list-of-values (cdr variables-values-pair))
+	 (Lambda (make-lambda variables (let-body exp))))
+
+    (println (cons Lambda list-of-values))
+
+    (cons Lambda list-of-values)))
 
 (define (make-procedure parameters body env)
   (list 'procedure parameters body env))
