@@ -1,3 +1,7 @@
+;; Using scan-out-defines in make-procedure is better because we only have to perform the procedure->let transformation once, when the procedure is defined.
+;;
+;; One of the main reasons for using procedures in programming is to reuse the same code or job. This translates into procedures typically being used more than they are defined.
+
 (define (main)
   (install-eval-package)
   (driver-loop))
@@ -59,8 +63,9 @@
   ((eval-procedure-table 'print)))
 
 (define (eval exp env)
-  ; (println exp)
-  (let ((eval-handler (get 'eval (type-tag exp))))
+  (println (list "EXP: " exp))
+  (let* ((type (type-tag exp))
+	 (eval-handler (begin (println (list "TYPE: " type)) (get 'eval type))))
     (if eval-handler
       (eval-handler exp env)
       ((get 'eval 'call) exp env))))
@@ -112,6 +117,29 @@
 	  (error
 	    "Unknown procedure type: APPLY" procedure))))
 
+(define unassigned '*unassigned*)
+
+;; body is a list of expressions
+;; create a inner procedure to explore all expressions
+;; it will produce three separate lists
+;; the first list will be the assignments for the let, whose values will be '*unassigned
+;; the second will be a list of set!s for these assignments
+;; the third will be the regular expressions for the let body
+;;
+;; after creating these lists, append the third onto the second to ensure the set!s appear first
+;; finally, return the let expression.
+(define (scan-out-defines body)
+  (define (iter assignments setters regular sub-body)
+    (if (null? sub-body)
+      (if (null? assignments) ;; if there are no assignments, return the regular body to not create an infinite cycle of converting lambdas to lets and lets to lambdas.
+	body
+	(list (make-let assignments (append setters regular))))
+      (let ((exp (car sub-body)))
+	(if (definition? exp)
+	   (iter (cons (list (definition-variable exp) 'unassigned) assignments) (cons (make-assignment (definition-variable exp) (definition-value exp)) setters) regular (cdr sub-body))
+	   (iter assignments setters (cons exp regular) (cdr sub-body))))))
+  (println (list "SCAN-OUT-DEFINES RESULT: " (iter '() '() '() body)))
+  (iter '() '() '() body))
 
 (define (list-of-values exps env)
   (if (no-operands? exps)
@@ -160,6 +188,8 @@
     (eq? (car exp) tag)
     false))
 
+(define (make-assignment var value)
+  (list 'set! var value))
 (define (assignment? exp) (tagged-list? exp 'set!))
 (define (assignment-variable exp) (cadr exp))
 (define (assignment-value exp) (caddr exp))
@@ -239,6 +269,8 @@
 ;; Let syntax
 ;; (let ((x 1) . . . (⟨varn⟩ ⟨expn⟩))
 ;;   ⟨body⟩)
+(define (make-let assignments body)
+  (cons 'let (cons assignments body)))
 (define (let-assignments exp)
   (cadr exp))
 (define (let-body exp)
@@ -278,7 +310,7 @@
     (cons Lambda list-of-values)))
 
 (define (make-procedure parameters body env)
-  (list 'procedure parameters body env))
+  (list 'procedure parameters (scan-out-defines body) env))
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
 (define (procedure-parameters p) (cadr p))
@@ -316,7 +348,10 @@
       (let ((frame (first-frame env)))
 	(scan (frame-variables frame)
 	      (frame-values frame)))))
-  (env-loop env))
+  (let ((value (env-loop env)))
+    (if (eq? value unassigned)
+      (error "Unassigned variable")
+      value)))
 
 (define (set-variable-value! var val env)
   (define (env-loop env)
@@ -364,6 +399,7 @@
 	(list 'println println)
 	(list 'map map)
 	(list '* *)
+	(list 'unassigned unassigned)
 	;; ⟨more primitives⟩
 	))
 (define (primitive-procedure-names)
