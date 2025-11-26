@@ -107,12 +107,19 @@
   (cond ((primitive-procedure? procedure)
 	 (apply-primitive-procedure procedure arguments))
 	((compound-procedure? procedure)
-	 (eval-sequence
-	   (procedure-body procedure)
-	   (extend-environment
-	     (procedure-parameters procedure)
-	     arguments
-	     (procedure-environment procedure))))
+	 (let* ((procedure-parts (scan-out-defines (procedure-body procedure)))
+		(parameters (if (null? procedure-parts) (procedure-parameters procedure) (append (car procedure-parts) (procedure-parameters procedure))))
+		(args (if (null? procedure-parts) arguments (append (cadr procedure-parts) arguments)))
+		(body (if (null? procedure-parts) (procedure-body procedure) (caddr procedure-parts))))
+	   (if (null? body)
+	     (error "empty procedure body --APPLY")
+	     (begin
+	       (eval-sequence
+		 body
+		 (extend-environment
+		   parameters
+		   args
+		   (procedure-environment procedure)))))))
 	(else
 	  (error
 	    "Unknown procedure type: APPLY" procedure))))
@@ -129,16 +136,15 @@
 ;; after creating these lists, append the third onto the second to ensure the set!s appear first
 ;; finally, return the let expression.
 (define (scan-out-defines body)
-  (define (iter assignments setters regular sub-body)
+  (define (iter vars values regular sub-body)
     (if (null? sub-body)
-      (if (null? assignments) ;; if there are no assignments, return the regular body to not create an infinite cycle of converting lambdas to lets and lets to lambdas.
-	body
-	(list (make-let assignments (append setters regular))))
+      (if (null? vars)
+	'()
+	(list vars values regular))
       (let ((exp (car sub-body)))
 	(if (definition? exp)
-	   (iter (cons (list (definition-variable exp) 'unassigned) assignments) (cons (make-assignment (definition-variable exp) (definition-value exp)) setters) regular (cdr sub-body))
-	   (iter assignments setters (cons exp regular) (cdr sub-body))))))
-  (println (list "SCAN-OUT-DEFINES RESULT: " (iter '() '() '() body)))
+	  (iter (cons (definition-variable exp) vars) (cons (definition-value exp) values) regular (cdr sub-body))
+	  (iter vars values (cons exp regular) (cdr sub-body))))))
   (iter '() '() '() body))
 
 (define (list-of-values exps env)
@@ -305,12 +311,10 @@
 	 (list-of-values (cdr variables-values-pair))
 	 (Lambda (make-lambda variables (let-body exp))))
 
-    (println (cons Lambda list-of-values))
-
     (cons Lambda list-of-values)))
 
 (define (make-procedure parameters body env)
-  (list 'procedure parameters (scan-out-defines body) env))
+  (list 'procedure parameters body env))
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
 (define (procedure-parameters p) (cadr p))
