@@ -403,6 +403,9 @@
 	(list 'println println)
 	(list 'map map)
 	(list '* *)
+	(list '- -)
+	(list '+ +)
+	(list '= =)
 	(list 'unassigned unassigned)
 	;; ⟨more primitives⟩
 	))
