@@ -1,0 +1,18 @@
+Alyssa's analyze-sequence procedure will perform the same loop to call the analyzed execution procedures each time
+the procedure in question is called.
+Basically her method returns a execution procedure which calls another procedure to loop and execute the bodies expression execution
+procedures. The loop procedure is called each time the procedure in question is called.
+
+With the original analyze-sequence version, we only loop once to build the wrapping execution procedure, subsequent calls to the
+procedure in question will be able to reuse the wrapping execution procedure instead of looping again.
+The original version returns a single, wrapping execution procedure that sequentially calls each expressions execution procedure
+without looping.
+
+For a sequence containing a single expression, the amount of work to be done in either versions will be roughly the same.
+However, Alyssa's version will still call the loop procedure, but since we only have one expression it will be limited to one
+iteration, but this iteration is invoked every time the procedure in question is called.
+The original method will loop once (also with only one iteration) in the analyze part, and never again during execution.
+The original method is slightly more efficient, but wouldn't be very noticeable with one expression in the body.
+
+However, with 2+ expressions the increase in the amount of work to be done will be more noticeable, as each iteration will be performed
+each time the procedure in question is used.
