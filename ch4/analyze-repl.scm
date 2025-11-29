@@ -1,7 +1,3 @@
-;; Using scan-out-defines in make-procedure is better because we only have to perform the procedure->let transformation once, when the procedure is defined.
-;;
-;; One of the main reasons for using procedures in programming is to reuse the same code or job. This translates into procedures typically being used more than they are defined.
-
 (define (main)
   (install-eval-package)
   (driver-loop))
@@ -62,23 +58,42 @@
 (define (print)
   ((eval-procedure-table 'print)))
 
+(define (stopwatch f)
+  (let ((start (get-universal-time))
+	(return-value (f)))
+    (println (list "STOPWATCH: " (- (get-universal-time) start)))
+    return-value))
+
 (define (eval exp env)
-  (println (list "EXP: " exp))
-  (with-timings (lambda () (let* ((type (type-tag exp))
-				  (eval-handler (begin (println (list "TYPE: " type)) (get 'eval type))))
-			     (if eval-handler
-			       (eval-handler exp env)
-			       ((get 'eval 'call) exp env))))
-		(lambda (run-time gc-time real-time)
-		  ;; run-time should be in milliseconds (current value of ticks according to docs)
-		  (println "TIME")
-		  (println run-time)
-		  (println gc-time)
-		  (println real-time)
-		  (println "DONE")
-		  )))
+  (let ((proc (analyze exp))) ;; separate out the analysis time
+    (with-timings (lambda () (proc env))  ;; from the execution time
+		  (lambda (run-time gc-time real-time)
+		    ;; run-time should be in milliseconds (current value of ticks according to docs)
+		    (println "EXECUTION TIME")
+		    (println run-time)
+		    (println gc-time)
+		    (println real-time)
+		    (println "DONE")
+		    ))))
+
+;; returns the execution procedures
+(define (analyze exp)
+  (with-timings (lambda ()
+		  (let* ((type (type-tag exp))
+			 (analysis-handler (get 'analyze type)))
+		    (if analysis-handler
+		      (analysis-handler exp)
+		      ((get 'analyze 'call) exp)))) (lambda (run-time gc-time real-time)
+						      ;; run-time should be in milliseconds (current value of ticks according to docs)
+						      (println "ANALYSIS TIME")
+						      (println run-time)
+						      (println gc-time)
+						      (println real-time)
+						      (println "DONE")
+						      )))
 
 (define (type-tag exp)
+  (println exp)
   (cond ((pair? exp) (car exp))
 	((boolean? exp) 'boolean)
 	((number? exp) 'number)
@@ -95,21 +110,106 @@
 (define (false? x) (eq? x false))
 
 (define (install-eval-package)
-  (define (identity exp env) exp)
-  (put 'eval 'boolean identity)
-  (put 'eval 'number identity)
-  (put 'eval 'string identity)
-  (put 'eval 'symbol lookup-variable-value)
-  (put 'eval 'quote text-of-quotation)
-  (put 'eval 'set! eval-assignment)
-  (put 'eval 'define eval-definition)
-  (put 'eval 'if eval-if)
-  (put 'eval 'lambda (lambda (exp env) (make-procedure (lambda-parameters exp) (lambda-body exp) env)))
-  (put 'eval 'begin (lambda (exp env) (eval-sequence (begin-actions exp) env)))
-  (put 'eval 'cond (lambda (exp env) (eval (cond->if exp) env)))
-  (put 'eval 'call (lambda (exp env) (apply (eval (operator exp) env) (list-of-values (operands exp) env))))
-  (put 'eval 'let (lambda (exp env) (eval (let->combination exp) env)))
+  (put 'analyze 'boolean analyze-self-evaluating)
+  (put 'analyze 'number analyze-self-evaluating)
+  (put 'analyze 'string analyze-self-evaluating)
+  (put 'analyze 'symbol analyze-variable)
+  (put 'analyze 'quote analyze-quote)
+  (put 'analyze 'set! analyze-assignment)
+  (put 'analyze 'define analyze-definition)
+  (put 'analyze 'if analyze-if)
+  (put 'analyze 'lambda analyze-lambda)
+  (put 'analyze 'begin (lambda (exp) (analyze-sequence (cdr exp))))
+  ; (put 'analyze 'cond analyze-cond)
+  (put 'analyze 'call analyze-application)
+  (put 'analyze 'let analyze-let)
   )
+
+(define (analyze-self-evaluating exp)
+  (lambda (env) exp))
+
+(define (analyze-variable exp)
+  (lambda (env) (lookup-variable-value exp env)))
+
+(define (analyze-quote exp)
+  (let ((text (text-of-quotation exp)))
+    (lambda (env) text)))
+
+(define (analyze-assignment exp)
+  (let ((var (assignment-variable exp))
+	(valproc (analyze (assignment-value exp))))
+    (lambda (env) (set-variable-value! var
+				       (valproc env)
+				       env))))
+
+(define (analyze-definition exp)
+  (let ((var (definition-variable exp))
+	(valproc (analyze (definition-value exp))))
+    (lambda (env)
+      (define-variable! var
+				    (valproc env)
+				    env))))
+
+(define (analyze-if exp)
+  (let ((predicate (analyze (if-predicate exp)))
+	(consequent (analyze (if-consequent exp)))
+	(alternate (analyze (if-alternative exp))))
+    (lambda (env) (if (true? (predicate env))
+		    (consequent env)
+		    (alternate env)))))
+
+(define (analyze-lambda exp)
+  (let ((parameters (lambda-parameters exp))
+	(bodyproc (analyze-sequence (lambda-body exp))))
+    (lambda (env) (make-procedure parameters bodyproc env))))
+
+;; return a single procedure, that when invoked will execute each expression procedure sequentially.
+;; turn each expression into an execution procedure
+;; write a procedure that when executed calls all of those execution procedures sequentially.
+(define (analyze-sequence exps)
+  (println "analyzing sequence")
+  (define (combine-procs-sequentially first rest)
+    (if (null? rest)
+      first
+      (lambda (env) (first env) ((combine-procs-sequentially (car rest) (cdr rest)) env))))
+
+  (let* ((exec-procs (map analyze exps)))
+    (if (null? exec-procs)
+      (error "sequence cannot be null")
+      (let ((sequential-procs (combine-procs-sequentially (car exec-procs) (cdr exec-procs))))
+	(lambda (env) (sequential-procs env))))))
+
+(define (analyze-application exp)
+  (let ((fproc (analyze (operator exp)))
+	(aprocs (map analyze (operands exp))))
+    (lambda (env)
+      (execute-application
+	(fproc env)
+	(map (lambda (aproc) (aproc env))
+	     aprocs)))))
+
+(define (execute-application proc args)
+  (cond ((primitive-procedure? proc)
+	 (apply-primitive-procedure proc args))
+	((compound-procedure? proc)
+	 ((procedure-body proc)
+	  (extend-environment
+	    (procedure-parameters proc)
+	    args
+	    (procedure-environment proc))))
+	(else
+	  (error "Unknown procedure type: EXECUTE-APPLICATION"
+		 proc))))
+
+(define (analyze-let exp)
+  (let* ((combination (let->combination exp))
+	 (analyzed-lambda (analyze (car combination)))
+	 (analyzed-args (map analyze (cdr combination))))
+    (lambda (env)
+      (execute-application
+	(analyzed-lambda env)
+	(map (lambda (arg) (arg env)) analyzed-args)))))
+
 
 (define (apply procedure arguments)
   (cond ((primitive-procedure? procedure)
@@ -174,12 +274,6 @@
 	  (eval (first-exp exps) env)
 	  (eval-sequence (rest-exps exps) env))))
 
-(define (eval-assignment exp env)
-  (set-variable-value! (assignment-variable exp)
-		       (eval (assignment-value exp) env)
-		       env)
-  'ok)
-
 (define (eval-definition exp env)
   ; (println "EVAL-DEFINITION")
   (define-variable! (definition-variable exp)
@@ -187,15 +281,10 @@
 		    env)
   'ok)
 
-(define (self-evaluating? exp)
-  (cond ((number? exp) true)
-	((string? exp) true)
-	(else false)))
-
 (define (variable? exp) (symbol? exp))
 
 (define (quoted? exp) (tagged-list? exp 'quote))
-(define (text-of-quotation exp env) (cadr exp))
+(define (text-of-quotation exp) (cadr exp))
 
 (define (tagged-list? exp tag)
   (if (pair? exp)
@@ -285,6 +374,8 @@
 ;;   ⟨body⟩)
 (define (make-let assignments body)
   (cons 'let (cons assignments body)))
+(define (make-let-assignment var val)
+  (list var val))
 (define (let-assignments exp)
   (cadr exp))
 (define (let-body exp)
@@ -411,6 +502,7 @@
 	(list 'println println)
 	(list 'map map)
 	(list '* *)
+	(list '/ /)
 	(list '- -)
 	(list '+ +)
 	(list '= =)

@@ -1,0 +1,21 @@
+1. Create a measurable scenario to compare between the original evaluator and the one with analysis.
+
+2. Implement a method to track the total time to evaluate the scenario expression.
+
+3. Using the time spent evaluating in the new evaluator with analysis, determine the fraction of time spent in the analysis phase.
+
+The evaluator using analysis is significantly more efficient for recursive procedures, as well as any procedures called more than once.
+
+When creating a procedure with define, most of the work of creating the definition is done in the analysis phase.
+However, when executing the procedure, most of the work is done in the execution phase, the analysis phase takes 0 milliseconds
+compared to the execution time. This is for the example procedure using iteration.
+
+I am recording the time in milliseconds (mit/scheme docs say ticks are currently measured in milliseconds), and when
+evaluating a procedure, the definition phase always has time spent in the analysis phase, with it's execution
+portion (writing the symbol to the environment) is basically 0.
+However, when executing that same procedure after the definition, 0 time is spent in the analysis phase, all the time is spent in the 
+execution part.
+Given that one of the phases is always 0 while the other is not, it is impossible for me to give an accurate fraction of time
+spent in the analyses phase.
+When testing expressions that aren't recursive or iterative, to little time is spent to produce an
+accurate answer.
