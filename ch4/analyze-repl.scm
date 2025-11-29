@@ -66,31 +66,15 @@
 
 (define (eval exp env)
   (let ((proc (analyze exp))) ;; separate out the analysis time
-    (with-timings (lambda () (proc env))  ;; from the execution time
-		  (lambda (run-time gc-time real-time)
-		    ;; run-time should be in milliseconds (current value of ticks according to docs)
-		    (println "EXECUTION TIME")
-		    (println run-time)
-		    (println gc-time)
-		    (println real-time)
-		    (println "DONE")
-		    ))))
+    (proc env)))
 
 ;; returns the execution procedures
 (define (analyze exp)
-  (with-timings (lambda ()
-		  (let* ((type (type-tag exp))
-			 (analysis-handler (get 'analyze type)))
-		    (if analysis-handler
-		      (analysis-handler exp)
-		      ((get 'analyze 'call) exp)))) (lambda (run-time gc-time real-time)
-						      ;; run-time should be in milliseconds (current value of ticks according to docs)
-						      (println "ANALYSIS TIME")
-						      (println run-time)
-						      (println gc-time)
-						      (println real-time)
-						      (println "DONE")
-						      )))
+  (let* ((type (type-tag exp))
+	 (analysis-handler (get 'analyze type)))
+    (if analysis-handler
+      (analysis-handler exp)
+      ((get 'analyze 'call) exp))))
 
 (define (type-tag exp)
   (println exp)
@@ -123,7 +107,26 @@
   ; (put 'analyze 'cond analyze-cond)
   (put 'analyze 'call analyze-application)
   (put 'analyze 'let analyze-let)
+  (put 'analyze 'unless unless->if)
   )
+
+(define (unless->if exp)
+  (let ((condition (unless-condition exp))
+	(usual-value (unless-usual-value exp))
+	(exceptional-value (unless-exceptional-value exp)))
+    ;; We analyze in the execution procedure to prevent the usual or exceptional expressions from being evaluated before they
+    ;; are needed. Used in conjunction with the if construct as it follows the evaluation process we need (doesn't evaluate either
+    ;; the consequent or alternative until a condition is met).
+    (lambda (env)
+      (if ((analyze condition) env)
+	((analyze exceptional-value) env)
+	((analyze usual-value) env)))))
+
+(define (make-unless condition usual-value exceptional-value)
+  (list 'unless condition usual-value exceptional-value))
+(define unless-condition cadr)
+(define unless-usual-value caddr)
+(define unless-exceptional-value cadddr)
 
 (define (analyze-self-evaluating exp)
   (lambda (env) exp))
