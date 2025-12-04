@@ -63,20 +63,11 @@
   ((eval-procedure-table 'print)))
 
 (define (eval exp env)
-  (println (list "EXP: " exp))
-  (with-timings (lambda () (let* ((type (type-tag exp))
-				  (eval-handler (begin (println (list "TYPE: " type)) (get 'eval type))))
-			     (if eval-handler
-			       (eval-handler exp env)
-			       ((get 'eval 'call) exp env))))
-		(lambda (run-time gc-time real-time)
-		  ;; run-time should be in milliseconds (current value of ticks according to docs)
-		  (println "TIME")
-		  (println run-time)
-		  (println gc-time)
-		  (println real-time)
-		  (println "DONE")
-		  )))
+  (let* ((type (type-tag exp))
+	 (eval-handler (get 'eval type)))
+    (if eval-handler
+      (eval-handler exp env)
+      ((get 'eval 'call) exp env))))
 
 (define (type-tag exp)
   (cond ((pair? exp) (car exp))
@@ -223,7 +214,6 @@
   'ok)
 
 (define (eval-definition exp env)
-  ; (println "EVAL-DEFINITION")
   (define-variable! (definition-variable exp)
 		    (eval (definition-value exp) env)
 		    env)
@@ -266,7 +256,6 @@
 (define (lambda-body exp) (cddr exp))
 
 (define (make-lambda parameters body)
-  ; (println "MAKE-LAMBDA")
   (cons 'lambda (cons parameters body)))
 
 (define (if? exp) (tagged-list? exp 'if))
@@ -459,6 +448,7 @@
 	(list '> >)
 	(list '< <)
 	(list 'unassigned unassigned)
+	(list 'list list)
 	;; ⟨more primitives⟩
 	))
 (define (primitive-procedure-names)
