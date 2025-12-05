@@ -1,3 +1,5 @@
+; (define (f a (b lazy) c (d lazy-memo)) (+ 1 b))
+; (define (f a b c d) (+ 1 b))
 ;; TODO:
 ;; - update/create define syntax procedures to support this new syntax:
 ;;       (define (f a (b lazy) c (d lazy-memo)) . . .)
@@ -94,6 +96,11 @@
 (define (true? x) (not (eq? x false)))
 (define (false? x) (eq? x false))
 
+;; TODO:
+;; add new 'eval handlers for both types of thunks, always returning the thunk without evaluating it.
+;; 
+;; only when applying thunks to primitive procedures will the thunk be forced.
+
 (define (install-eval-package)
   (define (identity exp env) exp)
   (put 'eval 'boolean identity)
@@ -108,23 +115,20 @@
   (put 'eval 'begin (lambda (exp env) (eval-sequence (begin-actions exp) env)))
   (put 'eval 'cond (lambda (exp env) (eval (cond->if exp) env)))
 
-  ; (define (f a (b lazy) c (d lazy-memo)) b)
+  ;; FIXME: for some reason, + is a parameter in our test procedure application
+
   (put 'eval 'call (lambda (exp env)
-		     (let* ((procedure (eval (operator exp) env))
-			   (parameters (procedure-parameters procedure))
-			   (arguments (operands exp))
-			   (processed-params-args (list-of-arg-values-and-delayed-args parameters arguments env))
-			   (processed-params (car processed-params-args))
-			   (processed-args (cdr processed-params-args))
-			   (new-procedure (make-procedure processed-params (procedure-body procedure) (procedure-environment procedure))))
-
-		       ;; TODO: determine a way to only evaluate non-lazy arguments (by checking the corresponding parameters)
-		       ;;       - one way is to create a new procedure that goes through all the arguments and parameters, only
-		       ;;         evaluate non-lazy ones, create thunks for lazy ones. For memoized lazy ones, create memoized thunks.
-		       ;;         (remember we have two versions of force-it available, one that uses memoization and one that doens't)
-		       (println (list "DEBUG" processed-params processed-args))
-
-		       (apply new-procedure processed-args))))
+		     (println exp)
+		     (let ((procedure (eval (operator exp) env)))
+		       (if (primitive-procedure? procedure)
+			 (apply procedure (list-of-arg-values (operands exp) env))
+			 (let* ((parameters (procedure-parameters procedure))
+				(arguments (operands exp))
+				(processed-params-args (list-of-arg-values-and-delayed-args parameters arguments env))
+				(processed-params (car processed-params-args))
+				(processed-args (cdr processed-params-args))
+				(new-procedure (make-procedure processed-params (procedure-body procedure) (procedure-environment procedure))))
+			   (apply new-procedure processed-args))))))
 
   (put 'eval 'let (lambda (exp env) (eval (let->combination exp) env))))
 
@@ -139,26 +143,48 @@
 	      ((lazy? param)
 	       (iter (cdr params) (cdr args) (append new-params (list (lazy-param param))) (append new-args (list (make-thunk arg env)))))
 	      (else (iter (cdr params) (cdr args) (append new-params (list param)) (append new-args (list (eval arg env)))))))))
-
   (if (= (length parameters) (length arguments))
     (iter parameters arguments '() '())
     (if (< (length parameters) (length arguments))
       (error "Too many arguments supplied" parameters arguments)
       (error "Too few arguments supplied" parameters arguments))))
 
+(define (list-of-arg-values exps env)
+  (if (no-operands? exps)
+    '()
+    (cons (actual-value (first-operand exps)
+			env)
+	  (list-of-arg-values (rest-operands exps)
+			      env))))
+
+;; FIXME:
+;; left off with a semi working evaluator
+;; just need to implement the lazy evaluation part, forcing values, knowing when to force.
+(define (actual-value exp env)
+  (println "DEBUG")
+  (println exp)
+  (let ((val (eval exp env)))
+    (cond ((memo-thunk? val) (thunk-arg val))  ;; TODO:
+	  ((thunk? val) (thunk-arg val)) ;; TODO:
+	  (else val))))
 
 (define (lazy-memo? exp)
   (and (pair? exp) (eq? (cadr exp) 'lazy-memo)))
 (define (make-memo-thunk arg env)
-  (list 'memo-thunk arg)) ;;env))
+  (list 'memo-thunk arg)) ;;env)) ;; TODO: may need this when forcing thunks.
+(define (memo-thunk? exp)
+  (tagged-list? exp 'memo-thunk))
 
 (define (lazy-param lazy)
   (car lazy))
+(define thunk-arg cadr)
 
 (define (lazy? exp)
   (and (pair? exp) (eq? (cadr exp) 'lazy)))
 (define (make-thunk arg env)
   (list 'thunk arg)) ;;env))
+(define (thunk? exp)
+  (tagged-list? exp 'thunk))
 
 (define (apply procedure arguments)
   (cond ((primitive-procedure? procedure)
@@ -399,6 +425,7 @@
       (error "Too many arguments supplied" vars vals)
       (error "Too few arguments supplied" vars vals))))
 
+;; TODO: maybe put a force-it in here if the value at a variable is a thunk?
 (define (lookup-variable-value var env)
   (define (env-loop env)
     (define (scan vars vals)
