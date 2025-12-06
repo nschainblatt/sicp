@@ -1,10 +1,18 @@
 ; Example procedures to evaluate in repl:
 
+;; note that calling non-primitive-procedure with b should leave the thunk to still be evaluated in the addition expression below it.
+;; (since the non-primitive-procedure doesn't ever use b in a primitive procedure).
+
+; (define (non-primitive-procedure x) 'ok)
 ; (define (f a (b lazy-memo) c (d lazy-memo))
+;   (non-primitive-procedure b)
 ;   (+ a b c d)
 ;   (+ a b c d))
 
+; (f (+ 1 1) (+ 2 2) (+ 3 3) (+ 4 4))
+
 ; (define (f a b c d) (+ 1 b))
+
 
 (define (main)
   (install-eval-package)
@@ -72,6 +80,7 @@
   ((eval-procedure-table 'print)))
 
 (define (eval exp env)
+  (print "EXP: " exp)
   (let* ((type (type-tag exp))
 	 (eval-handler (get 'eval type)))
     (if eval-handler
@@ -93,6 +102,23 @@
 (define true #t)
 (define (true? x) (not (eq? x false)))
 (define (false? x) (eq? x false))
+
+;; Optional lazy evaluation with procedures:
+;; 1. No changes were necessary to the syntax procedures, defining a procedure with the new syntax works fine with existing syntax
+;;    procedures:
+;       (define (f a (b lazy-memo) c (d lazy-memo))
+;         (+ a b c d)
+;         (+ a b c d))
+;;
+;; 2. Changes were made to the evaluation of applications, aka calling procedures.
+;;    - We evaluate the operator like normal, in order to get the procedure tied to the symbol
+;;    - Then we check if the procedure is primitive, if so we go through all arguments and force all of them
+;;        - If any arguments are thunks, they are forced, otherwise the expression is returned.
+;;    - For other procedures, we grab the parameters as well as the arguments to be applied.
+;;      - They are passed to a procedure to build the thunks for the arguments whose parameters were marked as lazy, with optional memo
+;;    - With the processed parameters and arguments, we create a new procedure to leave the original unmodified, and apply the
+;;      the arguments to it.
+;;    - apply applies the procedure like normal, thunks are not evaluated until a primitive procedure is encountered.
 
 (define (install-eval-package)
   (define (identity exp env) exp)
@@ -149,6 +175,7 @@
 
 (define (actual-value exp env)
   (let ((val (eval exp env)))
+    (print "val: " val)
     (force-it val env)))
 
 (define (force-it val env)
@@ -156,6 +183,7 @@
 	   (let ((inner-value (eval (thunk-arg val) env)))
 	     (set-car! val 'evaluated-thunk)
 	     (set-car! (cdr val) inner-value)
+	     (print "inner-value: " inner-value)
 	     inner-value))
 	  ((thunk? val) (eval (thunk-arg val) env))
 	  ((evaluated-thunk? val) (thunk-arg val))
