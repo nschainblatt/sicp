@@ -148,6 +148,27 @@
 
   (put 'eval 'let (lambda (exp env) (eval (let->combination exp) env))))
 
+(define (apply procedure arguments)
+  (cond ((primitive-procedure? procedure)
+	 (apply-primitive-procedure procedure arguments))
+	((compound-procedure? procedure)
+	 (let* ((procedure-parts (scan-out-defines (procedure-body procedure)))
+		(parameters (if (null? procedure-parts) (procedure-parameters procedure) (append (car procedure-parts) (procedure-parameters procedure))))
+		(args (if (null? procedure-parts) arguments (append (cadr procedure-parts) arguments)))
+		(body (if (null? procedure-parts) (procedure-body procedure) (caddr procedure-parts))))
+	   (if (null? body)
+	     (error "empty procedure body --APPLY")
+	     (begin
+	       (eval-sequence
+		 body
+		 (extend-environment
+		   parameters
+		   args
+		   (procedure-environment procedure)))))))
+	(else
+	  (error
+	    "Unknown procedure type: APPLY" procedure))))
+
 (define (list-of-arg-values-and-delayed-args parameters arguments env)
   (define (iter params args new-params new-args)
     (if (null? params)
@@ -210,26 +231,6 @@
 (define (evaluated-thunk? exp)
   (tagged-list? exp 'evaluated-thunk))
 
-(define (apply procedure arguments)
-  (cond ((primitive-procedure? procedure)
-	 (apply-primitive-procedure procedure arguments))
-	((compound-procedure? procedure)
-	 (let* ((procedure-parts (scan-out-defines (procedure-body procedure)))
-		(parameters (if (null? procedure-parts) (procedure-parameters procedure) (append (car procedure-parts) (procedure-parameters procedure))))
-		(args (if (null? procedure-parts) arguments (append (cadr procedure-parts) arguments)))
-		(body (if (null? procedure-parts) (procedure-body procedure) (caddr procedure-parts))))
-	   (if (null? body)
-	     (error "empty procedure body --APPLY")
-	     (begin
-	       (eval-sequence
-		 body
-		 (extend-environment
-		   parameters
-		   args
-		   (procedure-environment procedure)))))))
-	(else
-	  (error
-	    "Unknown procedure type: APPLY" procedure))))
 
 (define unassigned '*unassigned*)
 
