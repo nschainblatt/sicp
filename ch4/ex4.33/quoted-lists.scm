@@ -225,17 +225,31 @@
 
 (define (variable? exp) (symbol? exp))
 
+(define (make-quote exp)
+  (list 'quote exp))
 (define (quoted? exp) (tagged-list? exp 'quote))
 (define (text-of-quotation exp env)
   (let ((contents (cadr exp)))
     (if (pair? contents)
-      (make-lazy-list contents env)
+      (make-lazy-quoted-list contents env)
       contents)))
 
+;; Will allow the creation of lazy lists, for example:
+;; (define l '((+ 1 1) (+ 2 2) (+ 3 3)))
+;; (car l) => 2 ;; note that it was not evaluated when created, but evaluated when accessed/printed.
 (define (make-lazy-list regular-list env)
   (if (null? regular-list)
     '()
     (lazy-cons (delay-it (car regular-list) env) (make-lazy-list (cdr regular-list) env))))
+
+;; Will allow quotes lists elements to remain quoted, for example:
+;; (define l '(a b c))
+;; (car l) => a
+(define (make-lazy-quoted-list regular-list env)
+  (if (null? regular-list)
+    '()
+    (let ((item (car regular-list)))
+      (lazy-cons (delay-it (make-quote item) env) (make-lazy-quoted-list (cdr regular-list) env)))))
 
 (define (lazy-cons x y) (lambda (m) (m x y)))
 (define (lazy-car C) (C (lambda (x y) x)))
