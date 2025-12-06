@@ -143,7 +143,7 @@
   (put 'eval 'cond (lambda (exp env) (eval (cond->if exp) env)))
 
   (put 'eval 'call (lambda (exp env)
-		     (let ((procedure (eval (operator exp) env)))
+		     (let ((procedure (actual-value (operator exp) env)))
 		       (if (primitive-procedure? procedure)
 			 (apply procedure (list-of-arg-values (operands exp) env))
 			 (let* ((parameters (procedure-parameters procedure))
@@ -271,7 +271,7 @@
 	  (list-of-values (rest-operands exps) env))))
 
 (define (eval-if exp env)
-  (if (true? (eval (if-predicate exp) env))
+  (if (true? (actual-value (if-predicate exp) env))
     (eval (if-consequent exp) env)
     (eval (if-alternative exp) env)))
 
@@ -553,7 +553,7 @@
   ;   (+ a b c d)) the-global-environment)
   ; (eval '(f 1 2 3 4) the-global-environment)
   (let ((input (read)))
-    (let ((output (eval input the-global-environment)))
+    (let ((output (actual-value input the-global-environment)))
       (announce-output output-prompt)
       (user-print output)))
   (driver-loop))
