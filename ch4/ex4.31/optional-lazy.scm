@@ -24,10 +24,13 @@
   (newline)
   (display x))
 
-(define (print label x)
+(define (print . args)
   (newline)
-  (display label)
-  (display x))
+  (define (iter seq)
+    (if (null? seq)
+      'done
+      (begin (display (car seq)) (display " ") (iter (cdr seq)))))
+  (iter args))
 
 (define the-empty-table '(head))
 
