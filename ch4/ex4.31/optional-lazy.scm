@@ -1,17 +1,10 @@
-; (define (f a (b lazy) c (d lazy-memo)) (+ 1 b))
-; (define (f a b c d) (+ 1 b))
-;; TODO:
-;; - update/create define syntax procedures to support this new syntax:
-;;       (define (f a (b lazy) c (d lazy-memo)) . . .)
-;; - update eval/apply to skip evaluation of lazy or lazy-memo arguments
-;;   also update to support memoization with lazy-memo
+; Example procedures to evaluate in repl:
 
-;; steps:
-;;  1. implement the new syntax procedures to be able to debug the process
-;;       - actually, no syntax updates have to be made, the pair of the parameter and lazy/lazy-memo will just be in the parameter
-;;         list to use later.
-;;  2. print-debug the process to see where in eval we can check the type of the argument to skip evaluation, same
-;;     with memoization.
+; (define (f a (b lazy-memo) c (d lazy-memo))
+;   (+ a b c d)
+;   (+ a b c d))
+
+; (define (f a b c d) (+ 1 b))
 
 (define (main)
   (install-eval-package)
@@ -21,6 +14,11 @@
 
 (define (println x)
   (newline)
+  (display x))
+
+(define (print label x)
+  (newline)
+  (display label)
   (display x))
 
 (define the-empty-table '(head))
@@ -70,7 +68,7 @@
 (define (put type proc operation)
   ((eval-procedure-table 'insert) type proc operation))
 
-(define (print)
+(define (print-table)
   ((eval-procedure-table 'print)))
 
 (define (eval exp env)
@@ -96,11 +94,6 @@
 (define (true? x) (not (eq? x false)))
 (define (false? x) (eq? x false))
 
-;; TODO:
-;; add new 'eval handlers for both types of thunks, always returning the thunk without evaluating it.
-;; 
-;; only when applying thunks to primitive procedures will the thunk be forced.
-
 (define (install-eval-package)
   (define (identity exp env) exp)
   (put 'eval 'boolean identity)
@@ -115,10 +108,7 @@
   (put 'eval 'begin (lambda (exp env) (eval-sequence (begin-actions exp) env)))
   (put 'eval 'cond (lambda (exp env) (eval (cond->if exp) env)))
 
-  ;; FIXME: for some reason, + is a parameter in our test procedure application
-
   (put 'eval 'call (lambda (exp env)
-		     (println exp)
 		     (let ((procedure (eval (operator exp) env)))
 		       (if (primitive-procedure? procedure)
 			 (apply procedure (list-of-arg-values (operands exp) env))
@@ -157,21 +147,24 @@
 	  (list-of-arg-values (rest-operands exps)
 			      env))))
 
-;; FIXME:
-;; left off with a semi working evaluator
-;; just need to implement the lazy evaluation part, forcing values, knowing when to force.
 (define (actual-value exp env)
-  (println "DEBUG")
-  (println exp)
   (let ((val (eval exp env)))
-    (cond ((memo-thunk? val) (thunk-arg val))  ;; TODO:
-	  ((thunk? val) (thunk-arg val)) ;; TODO:
-	  (else val))))
+    (force-it val env)))
+
+(define (force-it val env)
+    (cond ((memo-thunk? val)
+	   (let ((inner-value (eval (thunk-arg val) env)))
+	     (set-car! val 'evaluated-thunk)
+	     (set-car! (cdr val) inner-value)
+	     inner-value))
+	  ((thunk? val) (eval (thunk-arg val) env))
+	  ((evaluated-thunk? val) (thunk-arg val))
+	  (else val)))
 
 (define (lazy-memo? exp)
   (and (pair? exp) (eq? (cadr exp) 'lazy-memo)))
 (define (make-memo-thunk arg env)
-  (list 'memo-thunk arg)) ;;env)) ;; TODO: may need this when forcing thunks.
+  (list 'memo-thunk arg)) ;;env)) ;; TODO: may need this when forcing thunks to gurantee values will be computed with right env.
 (define (memo-thunk? exp)
   (tagged-list? exp 'memo-thunk))
 
@@ -182,9 +175,12 @@
 (define (lazy? exp)
   (and (pair? exp) (eq? (cadr exp) 'lazy)))
 (define (make-thunk arg env)
-  (list 'thunk arg)) ;;env))
+  (list 'thunk arg)) ;;env)) ;; TODO:
 (define (thunk? exp)
   (tagged-list? exp 'thunk))
+
+(define (evaluated-thunk? exp)
+  (tagged-list? exp 'evaluated-thunk))
 
 (define (apply procedure arguments)
   (cond ((primitive-procedure? procedure)
@@ -487,6 +483,7 @@
 	(list 'display display)
 	(list 'newline newline)
 	(list 'println println)
+	(list 'print print)
 	(list 'map map)
 	(list '* *)
 	(list '- -)
