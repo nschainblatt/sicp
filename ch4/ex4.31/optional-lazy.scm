@@ -1,6 +1,6 @@
-; Example procedures to evaluate in repl:
+; Example procedures to evaluate in optionally lazy evaluator:
 
-;; note that calling non-primitive-procedure with b should leave the thunk to still be evaluated in the addition expression below it.
+;; Note that calling non-primitive-procedure with argument b should leave the thunk unevaluated in the addition expression below it.
 ;; (since the non-primitive-procedure doesn't ever use b in a primitive procedure).
 
 ; (define (non-primitive-procedure x) 'ok)
@@ -8,14 +8,15 @@
 ;   (non-primitive-procedure b)
 ;   (+ a b c d)
 ;   (+ a b c d))
-
-; (define (f a (b lazy-memo) c (d lazy-memo))
-;   b)
-
 ; (f (+ 1 1) (+ 2 2) (+ 3 3) (+ 4 4))
 
-; (define (f a b c d) (+ 1 b))
+;; This try cannot evaluate because the divide by zero is evaluated before the procedure body is evaluated.
+; (define (try a b) (if (= a 0) 1 b))
+; (try 0 (/ 1 0))
 
+;; This try can evaluate because the divide by zero is lazily evaluated.
+; (define (try a (b lazy))  (if (= a 0) 1 b))
+; (try 0 (/ 1 0))
 
 (define (main)
   (install-eval-package)
@@ -212,6 +213,7 @@
 	     (print "thunk-arg" (thunk-arg val))
 	     (set-car! val 'evaluated-thunk)
 	     (set-car! (cdr val) inner-value)
+	     (set-cdr! (cdr val) '())
 	     (print "inner-value: " inner-value)
 	     inner-value))
 	  ((thunk? val) (actual-value (thunk-arg val) (thunk-env val)))
@@ -523,6 +525,7 @@
 	(list 'print print)
 	(list 'map map)
 	(list '* *)
+	(list '/ /)
 	(list '- -)
 	(list '+ +)
 	(list '= =)
