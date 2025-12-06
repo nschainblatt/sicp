@@ -9,6 +9,9 @@
 ;   (+ a b c d)
 ;   (+ a b c d))
 
+; (define (f a (b lazy-memo) c (d lazy-memo))
+;   b)
+
 ; (f (+ 1 1) (+ 2 2) (+ 3 3) (+ 4 4))
 
 ; (define (f a b c d) (+ 1 b))
@@ -83,7 +86,6 @@
   ((eval-procedure-table 'print)))
 
 (define (eval exp env)
-  (print "EXP: " exp)
   (let* ((type (type-tag exp))
 	 (eval-handler (get 'eval type)))
     (if eval-handler
@@ -116,12 +118,15 @@
 ;; 2. Changes were made to the evaluation of applications, aka calling procedures.
 ;;    - We evaluate the operator like normal, in order to get the procedure tied to the symbol
 ;;    - Then we check if the procedure is primitive, if so we go through all arguments and force all of them
-;;        - If any arguments are thunks, they are forced, otherwise the expression is returned.
-;;    - For other procedures, we grab the parameters as well as the arguments to be applied.
-;;      - They are passed to a procedure to build the thunks for the arguments whose parameters were marked as lazy, with optional memo
+;;        - If any arguments are thunks, they are forced, otherwise the value of the evaluated expression is returned.
+;;    - For other procedures, we grab the parameters as well as the arguments to be applied. They are passed to a procedure to
+;;        build the thunks for the arguments whose parameters were marked as lazy, with optional memo if they are tagged as so.
 ;;    - With the processed parameters and arguments, we create a new procedure to leave the original unmodified, and apply the
 ;;      the arguments to it.
-;;    - apply applies the procedure like normal, thunks are not evaluated until a primitive procedure is encountered.
+;;    - apply works like normal, thunks are not evaluated until a primitive procedure is encountered (handled in eval)
+;;
+;;    With this solution, I had to place the bulk of the work inside eval so I have the env surrounding environment available to
+;;    handle the thunks.
 
 (define (install-eval-package)
   (define (identity exp env) exp)
@@ -199,35 +204,36 @@
 
 (define (actual-value exp env)
   (let ((val (eval exp env)))
-    (print "val: " val)
-    (force-it val env)))
+    (force-it val)))
 
-(define (force-it val env)
+(define (force-it val)
     (cond ((memo-thunk? val)
-	   (let ((inner-value (eval (thunk-arg val) env)))
+	   (let ((inner-value (actual-value (thunk-arg val) (thunk-env val))))
+	     (print "thunk-arg" (thunk-arg val))
 	     (set-car! val 'evaluated-thunk)
 	     (set-car! (cdr val) inner-value)
 	     (print "inner-value: " inner-value)
 	     inner-value))
-	  ((thunk? val) (eval (thunk-arg val) env))
-	  ((evaluated-thunk? val) (thunk-arg val))
+	  ((thunk? val) (actual-value (thunk-arg val) (thunk-env val)))
+	  ((evaluated-thunk? val) (print "evaluated-thunk " (thunk-arg val)) (thunk-arg val))
 	  (else val)))
 
 (define (lazy-memo? exp)
   (and (pair? exp) (eq? (cadr exp) 'lazy-memo)))
 (define (make-memo-thunk arg env)
-  (list 'memo-thunk arg)) ;;env)) ;; TODO: may need this when forcing thunks to gurantee values will be computed with right env.
+  (list 'memo-thunk arg env))
 (define (memo-thunk? exp)
   (tagged-list? exp 'memo-thunk))
 
 (define (lazy-param lazy)
   (car lazy))
 (define thunk-arg cadr)
+(define thunk-env caddr)
 
 (define (lazy? exp)
   (and (pair? exp) (eq? (cadr exp) 'lazy)))
 (define (make-thunk arg env)
-  (list 'thunk arg)) ;;env)) ;; TODO:
+  (list 'thunk arg env))
 (define (thunk? exp)
   (tagged-list? exp 'thunk))
 
@@ -453,7 +459,6 @@
       (error "Too many arguments supplied" vars vals)
       (error "Too few arguments supplied" vars vals))))
 
-;; TODO: maybe put a force-it in here if the value at a variable is a thunk?
 (define (lookup-variable-value var env)
   (define (env-loop env)
     (define (scan vars vals)
@@ -541,6 +546,12 @@
 
 (define (driver-loop)
   (prompt-for-input input-prompt)
+  ; (eval '(define (non-primitive-procedure x) 'ok) the-global-environment)
+  ; (eval '(define (f a (b lazy-memo) c (d lazy-memo))
+  ;   (non-primitive-procedure b)
+  ;   (+ a b c d)
+  ;   (+ a b c d)) the-global-environment)
+  ; (eval '(f 1 2 3 4) the-global-environment)
   (let ((input (read)))
     (let ((output (eval input the-global-environment)))
       (announce-output output-prompt)
