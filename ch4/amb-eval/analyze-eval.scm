@@ -13,14 +13,14 @@
 ;;;;  interface, due to renamings of apply).
 
 ;;;;Then you can initialize and start the evaluator by evaluating
-;;;; the two lines at the end of the file ch4-mceval.scm
+;;;; the two lines at the end of the file eval.scm
 ;;;; (setting up the global environment and starting the driver loop).
 
 
 ;;**implementation-dependent loading of evaluator file
 ;;Note: It is loaded first so that the section 4.1.7 definition
 ;; of eval overrides the definition from 4.1.1
-(load "ch4-mceval.scm")
+(load "eval.scm")
 
 ;;;SECTION 4.1.7
 
