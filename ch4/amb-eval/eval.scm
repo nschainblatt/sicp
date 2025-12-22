@@ -322,6 +322,7 @@
         (list 'println println)
         (list 'not not)
         (list 'eq? eq?)
+        (list 'even? even?)
 ;;      more primitives
         ))
 

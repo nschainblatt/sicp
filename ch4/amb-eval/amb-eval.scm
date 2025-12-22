@@ -13,6 +13,7 @@
         ((permanent-assignment? exp) (analyze-permanent-assignment exp))
         ((definition? exp) (analyze-definition exp))
         ((if? exp) (analyze-if exp))
+        ((if-fail? exp) (analyze-if-fail exp))
         ((lambda? exp) (analyze-lambda exp))
         ((let? exp) (analyze-let exp))
         ((begin? exp) (analyze-sequence (begin-actions exp)))
@@ -191,6 +192,26 @@
            succeed
            (lambda () (try-next (cdr choices))))))
       (try-next cprocs))))
+
+(define (if-fail? exp)
+  (tagged-list? exp 'if-fail))
+(define (if-fail-success exp)
+  (cadr exp))
+(define (if-fail-failure exp)
+  (caddr exp))
+
+(define (analyze-if-fail exp)
+  (let ((first (analyze (if-fail-success exp)))
+        (second (analyze (if-fail-failure exp))))
+    (lambda (env succeed fail)
+      (first env
+             (lambda (first-val fail2)
+               (succeed first-val fail2))
+             (lambda () 
+               (second env
+                       (lambda (second-val fail3)
+                         (succeed second-val fail3))
+                       fail))))))
 
 (define input-prompt ";;; Amb-Eval input:")
 (define output-prompt ";;; Amb-Eval value:")
