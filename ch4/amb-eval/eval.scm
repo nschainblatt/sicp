@@ -20,6 +20,20 @@
   (newline)
   (for-each (lambda (x) (display x) (display " ")) args))
 
+(define (prime? n)
+  (= (smallest-divisor n) 1))
+
+(define (smallest-divisor n)
+  (let ((n-root (sqrt n)))
+    (define (smallest-divisor-impl divisor)
+      (cond ((> divisor n-root) 1)
+            ((= (remainder n divisor) 0) divisor)
+            (else (smallest-divisor-impl (+ divisor 1)))))
+    (smallest-divisor-impl 2)))
+
+(define (square x)
+  (* x x))
+
 (define (eval exp env)
   (cond ((self-evaluating? exp) exp)
         ((variable? exp) (lookup-variable-value exp env))
@@ -323,6 +337,7 @@
         (list 'not not)
         (list 'eq? eq?)
         (list 'even? even?)
+        (list 'prime? prime?)
 ;;      more primitives
         ))
 
