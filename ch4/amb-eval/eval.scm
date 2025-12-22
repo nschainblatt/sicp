@@ -16,6 +16,10 @@
 
 ;;;SECTION 4.1.1
 
+(define (println . args)
+  (newline)
+  (for-each (lambda (x) (display x) (display " ")) args))
+
 (define (eval exp env)
   (cond ((self-evaluating? exp) exp)
         ((variable? exp) (lookup-variable-value exp env))
@@ -303,9 +307,14 @@
 (define primitive-procedures
   (list (list 'car car)
         (list 'cdr cdr)
+        (list 'cadr cadr)
+        (list 'caddr caddr)
+        (list 'cddr cddr)
         (list 'cons cons)
         (list 'null? null?)
         (list '* *)
+        (list 'list list)
+        (list 'println println)
 ;;      more primitives
         ))
 
