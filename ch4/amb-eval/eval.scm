@@ -313,8 +313,14 @@
         (list 'cons cons)
         (list 'null? null?)
         (list '* *)
+        (list '+ +)
+        (list '- -)
+        (list '/ /)
+        (list '> >)
+        (list '< <)
         (list 'list list)
         (list 'println println)
+        (list 'not not)
 ;;      more primitives
         ))
 
