@@ -194,8 +194,4 @@
       (newline) (display ";;; There is no current problem")
       (driver-loop))))
 
-
-;; ---
-
-(define the-global-environment (setup-environment))
-(driver-loop)
+'AMB-EVALUATOR-LOADED
