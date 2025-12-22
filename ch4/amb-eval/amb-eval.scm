@@ -10,6 +10,7 @@
         ((quoted? exp) (analyze-quoted exp))
         ((variable? exp) (analyze-variable exp))
         ((assignment? exp) (analyze-assignment exp))
+        ((permanent-assignment? exp) (analyze-permanent-assignment exp))
         ((definition? exp) (analyze-definition exp))
         ((if? exp) (analyze-if exp))
         ((lambda? exp) (analyze-lambda exp))
@@ -117,6 +118,19 @@
                             (set-variable-value!
                               var old-value env)
                             (fail2)))))
+             fail))))
+
+(define (permanent-assignment? exp)
+  (tagged-list? exp 'permanent-set!))
+
+(define (analyze-permanent-assignment exp)
+  (let ((var (assignment-variable exp))
+        (vproc (analyze (assignment-value exp))))
+    (lambda (env succeed fail)
+      (vproc env
+             (lambda (val fail2) ; *1*
+               (set-variable-value! var val env)
+               (succeed 'ok fail2))
              fail))))
 
 (define (analyze-application exp)

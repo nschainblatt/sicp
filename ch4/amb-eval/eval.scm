@@ -321,6 +321,7 @@
         (list 'list list)
         (list 'println println)
         (list 'not not)
+        (list 'eq? eq?)
 ;;      more primitives
         ))
 
