@@ -59,6 +59,20 @@
              ;; failure continuation for evaluating the predicate
              fail))))
 
+(define (analyze-let exp)
+  (let* ((combination (let->combination exp))
+         (analyzed-lambda (analyze (car combination)))
+         (analyzed-args (map analyze (cdr combination))))
+    (lambda (env succeed fail)
+      (analyzed-lambda env
+                       (lambda (proc fail2)
+                         (get-args analyzed-args
+                                   env
+                                   (lambda (args fail3)
+                                     (execute-application proc args succeed fail3))
+                                   fail2))
+                       fail))))
+
 (define (analyze-sequence exps)
   (define (sequentially a b)
     (lambda (env succeed fail)
