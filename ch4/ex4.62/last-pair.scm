@@ -34,3 +34,39 @@
 
 ; 2. If part of ?x is missing, and ?y is given, we work our way as far down as possible until one of the ?x rules fails, then we
 ;    operate with ?y and make one final recursive call with the list of last element (whats in ?y).
+
+;; Update:
+
+; It was actually much simpler to implement after reviewing online.
+; I shouldnt have implemented recursion myself and should have allowed the syste to do it for me by asserting
+; logical deductions:
+
+; From the book:
+; We can regard a rule as a kind of logical implication: If an assignment
+; of values to paern variables satisfies the body, then it satisfies the con-
+; clusion. Consequently, we can regard the query language as having the
+; ability to perform logical deductions based upon the rules. As an exam-
+; ple, consider the append operation described at the beginning of Section
+; 4.4. As we said, append can be characterized by the following two rules:
+; • For any list y, the empty list and y append to form y.
+; • For any u, v, y, and z, (cons u v) and y append to form (cons u z) if v and y append to form z.
+
+; To express this in our query language, we define two rules for a relation
+(append-to-form x y z)
+; which we can interpret to mean “x and y append to form z”:
+(rule (append-to-form () ?y ?y))
+(rule (append-to-form (?u . ?v) ?y (?u . ?z))
+      (append-to-form ?v ?y ?z))
+
+;; We can use these assumptions to create a rule using logical deductions:
+
+; The last pair of a single item list is the single item list.
+(rule (last-pair (?x) (?x)))
+
+; The last pair of a list is ?y if the last pair of ?rest is also ?y.
+(rule (last-pair (?car . ?rest) ?y)
+      (last-pair ?rest ?y))
+
+; For example: (last-pair (2 ?x) (3))
+; Our rules logically deduce this using the second rule, recursively breaking down the problem until the first rule:
+; (rule (last-pair (?x) (?x))) can be used, which returns the last pair back to the second rule, using it in the ?y variable.
