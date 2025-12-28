@@ -1,6 +1,5 @@
-(define the-empty-table '(head))
 (define (make-table)
-  (let ((table the-empty-table))
+  (let ((table '(head)))
 
     (define (scan type sub-table)
       (cond ((null? sub-table) #f)
@@ -37,7 +36,7 @@
 	    (else (error "unknown message --make-table"))))
     dispatch))
 
-(define eval-procedure-table (make-table))
+; (define eval-procedure-table (make-table))
 
 (define (get type proc)
   ((eval-procedure-table 'lookup) type proc))
@@ -47,3 +46,7 @@
 
 (define (print)
   ((eval-procedure-table 'print)))
+
+(define (println . args)
+  (newline)
+  (for-each (lambda (x) (display x) (display " ")) args))
