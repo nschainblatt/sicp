@@ -1,5 +1,7 @@
 (cd "..")
 (load "procedure-table.scm")
+(cd "amb-eval")
+(load "eval.scm")
 
 ;; Required for 'get' and 'put' methods on table instance.
 (define eval-procedure-table (make-table))
@@ -27,6 +29,12 @@
 		      (contract-question-mark v))))
 		(qeval q (singleton-stream '()))))
 	    (query-driver-loop)))))
+
+(define (display-line x)
+  (newline) (display x))
+
+(define (display-stream s)
+  (stream-for-each display-line s))
 
 (define (instantiate exp frame unbound-var-handler)
   (define (copy exp)
@@ -375,3 +383,6 @@
   (assoc variable frame))
 (define (extend variable value frame)
   (cons (make-binding variable value) frame))
+
+(define the-global-environment (setup-environment))
+(query-driver-loop)
