@@ -384,5 +384,38 @@
 (define (extend variable value frame)
   (cons (make-binding variable value) frame))
 
+(define (run q)
+  (cond ((assertion-to-be-added? q)
+	 (add-rule-or-assertion! (add-assertion-body q))
+	 (newline)
+	 (display "Assertion added to data base."))
+	(else
+	  (newline)
+	  (display output-prompt)
+	  (display-stream
+	    (stream-map
+	      (lambda (frame)
+		(instantiate
+		  q
+		  frame
+		  (lambda (v f)
+		    (contract-question-mark v))))
+	      (qeval q (singleton-stream '())))))))
+
+(define (run-many queries)
+  (for-each run queries))
+
 (define the-global-environment (setup-environment))
+(run '(assert! (address (Bitdiddle Ben) (Slumerville (Ridge Road) 10))))
+(run-many (list
+	    '(assert! (job (Bitdiddle Ben) (computer wizard)))
+	    '(assert! (salary (Bitdiddle Ben) 60000))
+	    ))
+(run-many (list
+	    '(assert! (address (Hacker Alyssa P) (Cambridge (Mass Ave) 78)))
+	    '(assert! (job (Hacker Alyssa P) (computer programmer)))
+	    '(assert! (salary (Hacker Alyssa P) 40000))
+	    '(assert! (supervisor (Hacker Alyssa P) (Bitdiddle Ben)))
+	    ))
+
 (query-driver-loop)
