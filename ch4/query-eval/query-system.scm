@@ -54,6 +54,55 @@
       (qproc (contents query) frame-stream)
       (simple-query query frame-stream))))
 
+;; Exercise 4.75
+
+;; Implement unique query type into evaluator
+
+;; Tasks
+;; 1. Create unique query syntax procedures
+;;     - predicate
+;;     - selectors
+;;     - dispatch procedure with put
+;; 2. unique query implementation procedures
+;;      - 
+
+
+;; Questions:
+;; - After we get the results from the query within unique, how do we nullify a result (remove it).
+;;     - TODO: check what happens in an and operation when one of the query returns no results
+;;     
+
+
+(define (println . args)
+  (newline)
+  (define (init a)
+    (if (null? a)
+      'done
+      (begin
+	(if (stream-pair? (car a))
+	  (begin (display "STREAM: ")
+		 (display-stream (car a)))
+	  (display (car a)))
+	(display " ") (init (cdr a)))))
+  (init args))
+
+
+;; We need to map over the frames in the stream
+;; Perform qeval on each of them, giving them a chance to be unique
+;; 
+(define (uniquely-asserted unique-query-contents frame-stream)
+  (let ((results (stream-flatmap
+		   (lambda (frame) 
+		     (let ((eval-results (qeval (car unique-query-contents) (singleton-stream frame))))
+		       ; (println (stream-length eval-results))
+		       (if (= (stream-length eval-results) 1)
+			 eval-results
+			 the-empty-stream)))
+		   frame-stream)))
+    ; (println (stream-length results))
+    results))
+(put 'unique 'qeval uniquely-asserted)
+
 (define (simple-query query-pattern frame-stream)
   (stream-flatmap
     (lambda (frame)
@@ -416,6 +465,9 @@
 	    '(assert! (job (Hacker Alyssa P) (computer programmer)))
 	    '(assert! (salary (Hacker Alyssa P) 40000))
 	    '(assert! (supervisor (Hacker Alyssa P) (Bitdiddle Ben)))
+	    '(assert! (job (Fect Cy D) (computer programmer)))
+	    '(assert! (job (Tweakit Lem E) (computer technician)))
+	    '(assert! (job (Warbucks Oliver) (administration big wheel)))
 	    ))
 
 (query-driver-loop)
