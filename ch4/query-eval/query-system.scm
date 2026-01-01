@@ -54,25 +54,6 @@
       (qproc (contents query) frame-stream)
       (simple-query query frame-stream))))
 
-;; Exercise 4.75
-
-;; Implement unique query type into evaluator
-
-;; Tasks
-;; 1. Create unique query syntax procedures
-;;     - predicate
-;;     - selectors
-;;     - dispatch procedure with put
-;; 2. unique query implementation procedures
-;;      - 
-
-
-;; Questions:
-;; - After we get the results from the query within unique, how do we nullify a result (remove it).
-;;     - TODO: check what happens in an and operation when one of the query returns no results
-;;     
-
-
 (define (println . args)
   (newline)
   (define (init a)
@@ -87,19 +68,14 @@
   (init args))
 
 
-;; We need to map over the frames in the stream
-;; Perform qeval on each of them, giving them a chance to be unique
-;; 
 (define (uniquely-asserted unique-query-contents frame-stream)
   (let ((results (stream-flatmap
 		   (lambda (frame) 
 		     (let ((eval-results (qeval (car unique-query-contents) (singleton-stream frame))))
-		       ; (println (stream-length eval-results))
 		       (if (= (stream-length eval-results) 1)
 			 eval-results
 			 the-empty-stream)))
 		   frame-stream)))
-    ; (println (stream-length results))
     results))
 (put 'unique 'qeval uniquely-asserted)
 
@@ -435,12 +411,8 @@
 
 (define (run q)
   (cond ((assertion-to-be-added? q)
-	 (add-rule-or-assertion! (add-assertion-body q))
-	 (newline)
-	 (display "Assertion added to data base."))
+	 (add-rule-or-assertion! (add-assertion-body q)))
 	(else
-	  (newline)
-	  (display output-prompt)
 	  (display-stream
 	    (stream-map
 	      (lambda (frame)
@@ -455,19 +427,47 @@
   (for-each run queries))
 
 (define the-global-environment (setup-environment))
-(run '(assert! (address (Bitdiddle Ben) (Slumerville (Ridge Road) 10))))
+
 (run-many (list
+	    '(assert! (address (Bitdiddle Ben) (Slumerville (Ridge Road) 10)))
 	    '(assert! (job (Bitdiddle Ben) (computer wizard)))
 	    '(assert! (salary (Bitdiddle Ben) 60000))
-	    ))
-(run-many (list
 	    '(assert! (address (Hacker Alyssa P) (Cambridge (Mass Ave) 78)))
 	    '(assert! (job (Hacker Alyssa P) (computer programmer)))
 	    '(assert! (salary (Hacker Alyssa P) 40000))
 	    '(assert! (supervisor (Hacker Alyssa P) (Bitdiddle Ben)))
+	    '(assert! (address (Fect Cy D) (Cambridge (Ames Street) 3)))
 	    '(assert! (job (Fect Cy D) (computer programmer)))
+	    '(assert! (salary (Fect Cy D) 35000))
+	    '(assert! (supervisor (Fect Cy D) (Bitdiddle Ben)))
+	    '(assert! (address (Tweakit Lem E) (Boston (Bay State Road) 22)))
 	    '(assert! (job (Tweakit Lem E) (computer technician)))
+	    '(assert! (salary (Tweakit Lem E) 25000))
+	    '(assert! (supervisor (Tweakit Lem E) (Bitdiddle Ben)))
+	    '(assert! (address (Reasoner Louis) (Slumerville (Pine Tree Road) 80)))
+	    '(assert! (job (Reasoner Louis) (computer programmer trainee)))
+	    '(assert! (salary (Reasoner Louis) 30000))
+	    '(assert! (supervisor (Reasoner Louis) (Hacker Alyssa P)))
+	    '(assert! (supervisor (Bitdiddle Ben) (Warbucks Oliver)))
+	    '(assert! (address (Warbucks Oliver) (Swellesley (Top Heap Road))))
 	    '(assert! (job (Warbucks Oliver) (administration big wheel)))
+	    '(assert! (salary (Warbucks Oliver) 150000))
+	    '(assert! (address (Scrooge Eben) (Weston (Shady Lane) 10)))
+	    '(assert! (job (Scrooge Eben) (accounting chief accountant)))
+	    '(assert! (salary (Scrooge Eben) 75000))
+	    '(assert! (supervisor (Scrooge Eben) (Warbucks Oliver)))
+	    '(assert! (address (Cratchet Robert) (Allston (N Harvard Street) 16)))
+	    '(assert! (job (Cratchet Robert) (accounting scrivener)))
+	    '(assert! (salary (Cratchet Robert) 18000))
+	    '(assert! (supervisor (Cratchet Robert) (Scrooge Eben)))
+	    '(assert! (address (Aull DeWitt) (Slumerville (Onion Square) 5)))
+	    '(assert! (job (Aull DeWitt) (administration secretary)))
+	    '(assert! (salary (Aull DeWitt) 25000))
+	    '(assert! (supervisor (Aull DeWitt) (Warbucks Oliver)))
+	    '(assert! (can-do-job (computer wizard) (computer programmer)))
+	    '(assert! (can-do-job (computer wizard) (computer technician)))
+	    '(assert! (can-do-job (computer programmer) (computer programmer trainee)))
+	    '(assert! (can-do-job (administration secretary) (administration big wheel)))
 	    ))
 
 (query-driver-loop)
