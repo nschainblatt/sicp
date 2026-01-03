@@ -102,6 +102,26 @@
 ;;    If they are compatible, a single new merged frame is returned as output
 ;;    If they are incompatible, 'failed is returned.
 
+;; Returns true if both frames supplied are compatible.
+;; A compatible pair of frames are two frames that if they have any shared variable symbols, they have the save values.
+;; A compatible frame can be one that has no shared variables.
+;; If these were stored in a hash-table instead of a sequence of pairs, I would be able to do more efficient comparisons of variables.
+;; Implementation Details:
+(define (if-compatible-merge frame1 frame2)
+  (define (iter f1 f2 result)
+    (if (null? f1)
+      result
+      (let ((f1-binding (car f1))
+	    (f2-binding-seq (binding-in-frame (binding-variable f1-binding) f2))) ;; result from assoc (rest of list after finding binding with binding as car).
+	(if f2-binding-seq
+	  (if (equal? (binding-value f1-binding) (car f2-binding-seq))
+	    (if-compatible-merge (cdr f1) f2 (cons f1-binding result)) ;; found binding and values are equal, compatible.
+	    #f) ;; found binding, but values were different, not compatible.
+	  (if-compatible-merge (cdr f1) f2 (cons f1-binding result)))))) ;; didn't find binding in f2, good to add to final frame.
+  (cond ((null? frame1) frame2) ;; if frame1 is null return frame2 as we want every binding in frame2 since it's compatible.
+	((null? frame2) frame1) ;; "
+	(else (iter frame1 frame2 '()))))
+
 ;; 4. Design a procedure that calls the comparison procedure from problem #3 with every frame combination in the two streams of frames.
 ;;    This will have quadratic time complexity as we have to compare every single frame with every other frame. N*M where N is the size of the first
 ;;    stream of frames and M is the size of the second. This iterator is in charge of constructing the new output stream of frames. It filters out the 'failed
