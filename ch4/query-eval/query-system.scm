@@ -117,6 +117,7 @@
 	  (if (equal? (binding-value f1-binding) (car f2-binding-seq))
 	    (if-compatible-merge (cdr f1) f2 (cons f1-binding result)) ;; found binding and values are equal, compatible.
 	    #f) ;; found binding, but values were different, not compatible.
+	  ;;  ^^ NOTE: this may be a bug, since #f will get lost in result. Can probably filter out the #f like they do with 'failed in pattern matching.
 	  (if-compatible-merge (cdr f1) f2 (cons f1-binding result)))))) ;; didn't find binding in f2, good to add to final frame.
   (cond ((null? frame1) frame2) ;; if frame1 is null return frame2 as we want every binding in frame2 since it's compatible.
 	((null? frame2) frame1) ;; "
@@ -126,6 +127,27 @@
 ;;    This will have quadratic time complexity as we have to compare every single frame with every other frame. N*M where N is the size of the first
 ;;    stream of frames and M is the size of the second. This iterator is in charge of constructing the new output stream of frames. It filters out the 'failed
 ;;    merges from the successful one, keeping a single stream of frames that are compatible.
+
+;; Returns a stream of frames that is the result of merging all compatible frames in each stream input argument.
+(define (comparison frame-stream1 frame-stream2)
+  ;; Compare each frame in f1-stream to each in f2-stream, for compatibility.
+  ;; Build up a result that is a one dimensional stream of merged frames.
+  (define (iter f1-stream f2-stream result)
+    (if (null? f1-stream)
+      result
+      (let ((frame (stream-car f1-stream)))
+	(define (compaterator frame-stream)
+	  (if (null? frame-stream)
+	    '()
+	    (let ((frame-optional (if-compatible-merge frame (car frame-stream))))
+	      (if frame-optional
+		(stream-cons frame-optional result)))))
+	(iter (stream-cdr f1-stream) f2-stream (compaterator f2-stream)))))
+
+  ;; TODO: determine if this cond is necessary
+  (cond ((null? frame-stream1) frame-stream2)
+	((null? frame-stream2) frame-stream1)
+	(else (iter frame-stream1 frame-stream2 '()))))
 
 ;; 5. Glue all of this together inside conjoin. Update conjoin to qeval each of the two clauses independently, both with the original frame-stream.
 ;;    Then with these two extended stream frames pass them to the comparison iterator from problem #4.
