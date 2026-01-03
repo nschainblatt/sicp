@@ -111,7 +111,7 @@
   (define (iter f1 f2 result)
     (if (null? f1)
       result
-      (let ((f1-binding (car f1))
+      (let* ((f1-binding (car f1))
 	    (f2-binding-seq (binding-in-frame (binding-variable f1-binding) f2))) ;; result from assoc (rest of list after finding binding with binding as car).
 	(if f2-binding-seq
 	  (if (equal? (binding-value f1-binding) (car f2-binding-seq))
@@ -153,12 +153,15 @@
 ;;    Then with these two extended stream frames pass them to the comparison iterator from problem #4.
 ;;    Return the final stream of frames from the last call to the iterator as the return value for conjoin.
 
+;; TODO: support more than two conjuncts.
 (define (conjoin conjuncts frame-stream)
-  (if (empty-conjunction? conjuncts)
-    frame-stream
-    (conjoin (rest-conjuncts conjuncts)
-	     (qeval (first-conjunct conjuncts) frame-stream))))
+  (let ((frame-stream1 (qeval (first-conjunct conjuncts) frame-stream))
+	(frame-stream2 (qeval (first-conjunct (rest-conjuncts conjuncts)) frame-stream)))
+    (comparison frame-stream1 frame-stream2)))
 (put 'and 'qeval conjoin)
+
+;; (and (job ?person (computer programmer))
+;;      (supervisor ?person ?anyone))
 
 (define (disjoin disjuncts frame-stream)
   (if (empty-disjunction? disjuncts)
