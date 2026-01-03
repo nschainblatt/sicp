@@ -87,6 +87,30 @@
 	(delay (apply-rules query-pattern frame))))
     frame-stream))
 
+;; problems:
+
+;; 1. Process the two 'and' clauses separately. just start with two for now, do more than two later.
+
+;; 2. Look for all pairs of compatible frames.
+;;    A comparible pair frames are two that if they have the same variable symbol, they have the save value. A compatible
+;;    frame can be one that has no shared variables.
+;;    When a compatible pair of frames are found, they are merged:
+;;    ((a 1) (b 2) (c 3)) + ((a 1) (d 4) (e 5)) = ((a 1) (b 2) (c 3) (d 4) (e 5))
+;;    Note: all shared variable symbols in two frames must be equal for them to be compatible.
+
+;; 3. Design a procedure that accepts two frames and determines if they are compatible.
+;;    If they are compatible, a single new merged frame is returned as output
+;;    If they are incompatible, 'failed is returned.
+
+;; 4. Design a procedure that calls the comparison procedure from problem #3 with every frame combination in the two streams of frames.
+;;    This will have quadratic time complexity as we have to compare every single frame with every other frame. N*M where N is the size of the first
+;;    stream of frames and M is the size of the second. This iterator is in charge of constructing the new output stream of frames. It filters out the 'failed
+;;    merges from the successful one, keeping a single stream of frames that are compatible.
+
+;; 5. Glue all of this together inside conjoin. Update conjoin to qeval each of the two clauses independently, both with the original frame-stream.
+;;    Then with these two extended stream frames pass them to the comparison iterator from problem #4.
+;;    Return the final stream of frames from the last call to the iterator as the return value for conjoin.
+
 (define (conjoin conjuncts frame-stream)
   (if (empty-conjunction? conjuncts)
     frame-stream
