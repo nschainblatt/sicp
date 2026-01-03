@@ -1,11 +1,25 @@
 ;; (and (job ?person (computer programmer))
-;;      (supervisor ?person ?anyone))
+;;      (supervisor ?person ?anyone)
+;;      (address ?person ?any))
+
+;; (and (job ?x ?y)
+;;      (supervisor ?x ?a))
 
 ;; (and (job ?x ?y)
 ;;      (supervisor ?z ?a))
 
 ;; (and (salary ?x ?a)
-;;      (lisp-value > ?a 30000)) ;; NOTE: lisp-value variable ?a will be unbound with our 'seperate' handling of frame streams with the new version of conjoin.
+;;      (lisp-value > ?a 30000))
+
+;; NOTE: Some downsides:
+;; - lisp-value is unable to use variables from previous queries in conjunction since they are kept separate.
+;;   This is because list-value requires variables to be bound during it's evaluation. We don't merge frames until after evaluation.
+;;
+;; - Unable to deduce that a constant matches the same spot as a variable in an earlier query:
+;;      (and (job ?person (computer programmer))
+;;           (supervisor ?person ?anyone)
+;;           (job (Hacker Alyssa P) (computer programmer)))
+;;   It doesn't know that ?person should be (Hacker Alyssa P), leading to unexpected results.
 
 (cd "..")
 (load "procedure-table.scm")
@@ -193,13 +207,15 @@
 ;;    Then with these two extended stream frames pass them to the comparison iterator from problem #4.
 ;;    Return the final stream of frames from the last call to the iterator as the return value for conjoin.
 
-;; TODO: support more than two conjuncts.
 (define (conjoin conjuncts frame-stream)
-  (let ((frame-stream1 (qeval (first-conjunct conjuncts) frame-stream))
-	(frame-stream2 (qeval (first-conjunct (rest-conjuncts conjuncts)) frame-stream)))
-    (println "CONJOIN STREAMS: \n1. " frame-stream1 "\n2. " frame-stream2)
-    ; (println "CONJOIN COMPARISON RESULT: " (comparison frame-stream1 frame-stream2))
-    (comparison frame-stream1 frame-stream2)))
+  ;; Process each clause seperately recursively. (in a list of frame-streams)
+  ;; Iterate through two frame streams as a time, merging them then passing the result as the next first stream to be merged with the rest.
+  (define (iter rest result)
+    (if (empty-conjunction? rest)
+      result
+      (iter (rest-conjuncts rest) (comparison (qeval (first-conjunct rest) frame-stream) result))))
+  ;; at least two are required
+  (iter (rest-conjuncts conjuncts) (qeval (first-conjunct conjuncts) frame-stream)))
 (put 'and 'qeval conjoin)
 
 (define (disjoin disjuncts frame-stream)
