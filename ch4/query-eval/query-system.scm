@@ -1,3 +1,12 @@
+;; (and (job ?person (computer programmer))
+;;      (supervisor ?person ?anyone))
+
+;; (and (job ?x ?y)
+;;      (supervisor ?z ?a))
+
+;; (and (salary ?x ?a)
+;;      (lisp-value > ?a 30000)) ;; NOTE: lisp-value variable ?a will be unbound with our 'seperate' handling of frame streams with the new version of conjoin.
+
 (cd "..")
 (load "procedure-table.scm")
 (cd "amb-eval")
@@ -5,6 +14,11 @@
 
 ;; Required for 'get' and 'put' methods on table instance.
 (define eval-procedure-table (make-table))
+
+(define (append-stream stream1 stream2)
+  (if (null? stream1)
+    stream2
+    (cons-stream (stream-car stream1) (append-stream (stream-cdr stream1) stream2))))
 
 (define input-prompt ";;; Query input:")
 (define output-prompt ";;; Query results:")
@@ -62,7 +76,9 @@
       (begin
 	(if (stream-pair? (car a))
 	  (begin (display "STREAM: ")
-		 (display-stream (car a)))
+		 (display-stream (car a))
+		 ; (display (car a))
+		 )
 	  (display (car a)))
 	(display " ") (init (cdr a)))))
   (init args))
@@ -108,20 +124,37 @@
 ;; If these were stored in a hash-table instead of a sequence of pairs, I would be able to do more efficient comparisons of variables.
 ;; Implementation Details:
 (define (if-compatible-merge frame1 frame2)
+  ; (println "IF COMPATIBLE MERGE" frame1 frame2)
   (define (iter f1 f2 result)
     (if (null? f1)
-      result
+      (merge-frames result frame2) ;; at the end, the frames are compatible, we need to add the remaining f2 bindings that aren't already in the result. The result contains all bindings from f1.
       (let* ((f1-binding (car f1))
-	    (f2-binding-seq (binding-in-frame (binding-variable f1-binding) f2))) ;; result from assoc (rest of list after finding binding with binding as car).
-	(if f2-binding-seq
-	  (if (equal? (binding-value f1-binding) (car f2-binding-seq))
-	    (if-compatible-merge (cdr f1) f2 (cons f1-binding result)) ;; found binding and values are equal, compatible.
-	    #f) ;; found binding, but values were different, not compatible.
-	  ;;  ^^ NOTE: this may be a bug, since #f will get lost in result. Can probably filter out the #f like they do with 'failed in pattern matching.
-	  (if-compatible-merge (cdr f1) f2 (cons f1-binding result)))))) ;; didn't find binding in f2, good to add to final frame.
+	     (f2-binding-optional (binding-in-frame (binding-variable f1-binding) f2))) ;; result from assoc (rest of list after finding binding with binding as car).
+	; (println "BINDING-1: " f1-binding "BINDING-2: " f2-binding-optional)
+	; (println "VALUE-1: " (binding-value f1-binding) "VALUE-2: " (binding-value f2-binding-optional))
+	(if f2-binding-optional
+	  (if (equal? (binding-value f1-binding) (binding-value f2-binding-optional))
+	    (begin #|(println "THEY ARE EQUAL, COMPATIBLE")|# (iter (cdr f1) f2 (cons f1-binding result))) ;; found binding and values are equal, compatible, check next. Append the rest of any leftover f2 bindings, leaving out the current to prevent duplicate for the matching binding with f1.
+	    (begin #|(println "NOT EQUAl, NOT COMPATIBLE")|# #f)) ;; found binding, but values were different, not compatible.
+	  (begin #|(println "NO BINDING IN F2, COMPATIBLE")|# (iter (cdr f1) f2 (cons f1-binding result))))))) ;; didn't find binding in f2, good to add to final frame.
   (cond ((null? frame1) frame2) ;; if frame1 is null return frame2 as we want every binding in frame2 since it's compatible.
 	((null? frame2) frame1) ;; "
 	(else (iter frame1 frame2 '()))))
+
+;; Merge frame2 onto frame1, ignoring any duplicate bindings.
+(define (merge-frames frame1 frame2)
+  ;; iterate over every binding in frame2. 
+  ;; check if it exists in frame1
+  ;;  - if it does, continue
+  ;;  - if it doesn't cons and continue
+  ; (println "MERGE FRAMES: " frame1 frame2)
+  (if (null? frame2)
+    frame1
+    (let ((binding (car frame2)))
+      ; (println "IN FRAME?" binding frame1 (binding-in-frame (binding-variable binding) frame1))
+      (if (binding-in-frame (binding-variable binding) frame1)
+	(merge-frames frame1 (cdr frame2))
+	(merge-frames (cons binding frame1) (cdr frame2))))))
 
 ;; 4. Design a procedure that calls the comparison procedure from problem #3 with every frame combination in the two streams of frames.
 ;;    This will have quadratic time complexity as we have to compare every single frame with every other frame. N*M where N is the size of the first
@@ -133,18 +166,25 @@
   ;; Compare each frame in f1-stream to each in f2-stream, for compatibility.
   ;; Build up a result that is a one dimensional stream of merged frames.
   (define (iter f1-stream f2-stream result)
+    ; (println "COMPARISON ITER RESULTS" result)
     (if (null? f1-stream)
       result
       (let ((frame (stream-car f1-stream)))
+	; (println "COMPARISON F1 FRAME: " frame)
 	(define (compaterator frame-stream)
-	  (if (null? frame-stream)
-	    '()
-	    (let ((frame-optional (if-compatible-merge frame (car frame-stream))))
-	      (if frame-optional
-		(stream-cons frame-optional result)))))
-	(iter (stream-cdr f1-stream) f2-stream (compaterator f2-stream)))))
+	  ; (println "COMPATERATOR FRAME STREAM: " frame-stream)
+	  (let ((frame-stream (if (promise? frame-stream) (force frame-stream) frame-stream)))
+	    (if (null? frame-stream)
+	      '()
+	      (let ((frame-optional (if-compatible-merge frame (car frame-stream))))
+		; (println "NEXT FRAME: " frame-stream)
+		; (println "FRAME OPTIONAL: " frame-optional)
+		(if frame-optional
+		  (cons-stream frame-optional (compaterator (cdr frame-stream)))
+		  (compaterator (cdr frame-stream))
+		  )))))
+	(iter (stream-cdr f1-stream) f2-stream (append-stream result (compaterator f2-stream))))))
 
-  ;; TODO: determine if this cond is necessary
   (cond ((null? frame-stream1) frame-stream2)
 	((null? frame-stream2) frame-stream1)
 	(else (iter frame-stream1 frame-stream2 '()))))
@@ -157,11 +197,10 @@
 (define (conjoin conjuncts frame-stream)
   (let ((frame-stream1 (qeval (first-conjunct conjuncts) frame-stream))
 	(frame-stream2 (qeval (first-conjunct (rest-conjuncts conjuncts)) frame-stream)))
+    (println "CONJOIN STREAMS: \n1. " frame-stream1 "\n2. " frame-stream2)
+    ; (println "CONJOIN COMPARISON RESULT: " (comparison frame-stream1 frame-stream2))
     (comparison frame-stream1 frame-stream2)))
 (put 'and 'qeval conjoin)
-
-;; (and (job ?person (computer programmer))
-;;      (supervisor ?person ?anyone))
 
 (define (disjoin disjuncts frame-stream)
   (if (empty-disjunction? disjuncts)
@@ -389,6 +428,7 @@
 	(delay (stream-cdr s1))))))
 
 (define (stream-flatmap proc s)
+  ; (println proc s)
   (flatten-stream (stream-map proc s)))
 
 (define (flatten-stream stream)
@@ -475,6 +515,8 @@
 (define (binding-value binding) (cdr binding))
 (define (binding-in-frame variable frame)
   (assoc variable frame))
+(define (binding-in-frame-include-rest binding frame)
+  (member binding frame))
 (define (extend variable value frame)
   (cons (make-binding variable value) frame))
 
