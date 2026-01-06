@@ -1,3 +1,21 @@
+;; Exercise 4.78
+
+;; Update the query system to run inside the AMB evaluator.
+;; Allowing the query system to make use of non-deterministic
+;; search and backtracking instead of the stream of frames.
+
+;; Note that the query system will now run as a program within
+;; the AMB evaluator.
+
+;; So to use the query system. You must start the AMB evaluator,
+;; feed it the procedures that make up the query system, add 
+;; sample data, and then begin querying.
+
+;; I will be making a query-system procedure to load all of this automatically
+;; when you load this script.
+
+;; ---
+
 ;;;;QUERY SYSTEM FROM SECTION 4.4.4 OF
 ;;;; STRUCTURE AND INTERPRETATION OF COMPUTER PROGRAMS
 
