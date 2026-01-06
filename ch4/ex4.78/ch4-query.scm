@@ -14,6 +14,25 @@
 ;; I will be making a query-system procedure to load all of this automatically
 ;; when you load this script.
 
+;; Problems:
+
+;; 1. Redesign the query language to run inside the AMB evaluator to make use of non-deterministic search and backtracking instead of using the stream of frames.
+;;    - Read this script from within the AMB evaluator to get the system procedures
+;;    - Update all usages of transformers (e.g. cons-stream) to use the AMB evaluator (point of this exercise and the fact that you can't use transformers as an expressions)
+;;       - Why were streams used? To obtain all possible matches with easy ability to filter out mismatched.
+;;       - How can we replace streams with AMB? AMB can be used instead of streams.
+;;          We could simply place all database assertions and rules inside of the AMB expression (interleaves so we don't just get assertions and then rules, todo).
+;;          AMB will do the work for us by trying each choice until the first one that works. That will be returned and printed.
+;;          Try again will allow the AMB to continue and try the next choice, until it gets another that matches. Prints that one and continues.
+;;       - Are there any other AMB usages we need to replace the functionality of streams? Such as filtering or something similar?
+;;          - I don't think so. We use the existing pattern matching functions (updated to no longer use streams) to check if the current query matches
+;;            the current database records given from AMB. Filtering operations (not and lisp-value) will work the same way as before, except instead of eliminating
+;;            the current frame, it will call the empty amb expression (amb) to force a backtrack to occur to try the next value.
+
+;; 2. What is the subtle difference AMB brings that didn't exist with the stream of frames approach?
+
+;; 2a. What are some examples of this?
+
 ;; ---
 
 ;;;;QUERY SYSTEM FROM SECTION 4.4.4 OF
@@ -49,15 +68,10 @@
            (newline)
            (display output-prompt)
            ;; [extra newline at end] (announce-output output-prompt)
-           (display-stream
-            (stream-map
-             (lambda (frame)
-               (instantiate q
-                            frame
-                            (lambda (v f)
+           (newline)
+           (display (instantiate q (qeval q) (lambda (v f)
                               (contract-question-mark v))))
-             (qeval q (singleton-stream '()))))
-           (query-driver-loop)))))
+           ))))
 
 (define (instantiate exp frame unbound-var-handler)
   (define (copy exp)
@@ -75,41 +89,42 @@
 ;;;SECTION 4.4.4.2
 ;;;The Evaluator
 
-(define (qeval query frame-stream)
+(define (qeval query)
   (let ((qproc (get (type query) 'qeval)))
     (if qproc
-        (qproc (contents query) frame-stream)
-        (simple-query query frame-stream))))
+        (qproc (contents query) '())
+        (simple-query query))))
 
 ;;;Simple queries
 
-(define (simple-query query-pattern frame-stream)
-  (stream-flatmap
-   (lambda (frame)
-     (stream-append-delayed
-      (find-assertions query-pattern frame)
-      (delay (apply-rules query-pattern frame))))
-   frame-stream))
+;; TODO: temporarily always returning both the first assertion and rule that works.
+(define (simple-query query-pattern)
+  (find-assertions query-pattern))
+
+;; TODO: (apply-rules query-pattern)
 
 ;;;Compound queries
 
-(define (conjoin conjuncts frame-stream)
+(define (conjoin conjuncts frame)
   (if (empty-conjunction? conjuncts)
-      frame-stream
+      frame
       (conjoin (rest-conjuncts conjuncts)
-               (qeval (first-conjunct conjuncts)
-                      frame-stream))))
+               (qeval (first-conjunct conjuncts)))))
 
 ;;(put 'and 'qeval conjoin)
 
 
-(define (disjoin disjuncts frame-stream)
-  (if (empty-disjunction? disjuncts)
-      the-empty-stream
-      (interleave-delayed
-       (qeval (first-disjunct disjuncts) frame-stream)
-       (delay (disjoin (rest-disjuncts disjuncts)
-                       frame-stream)))))
+;; Uses AMB to return the first valid frame in the 'or' clauses. Try again will find the next match, until no more.
+;; This is required for disjoin and not conjoin since or has a independent frame for each clause until the end. So each clause
+;; could potentially have it's own valid choice. Try again will try another option for or until no more. Then the outer query
+;; will try a new path at the root amb.
+;; FIXME:
+(define (disjoin disjuncts frame)
+  (define (iter rest-disjuncts frames)
+    (if (empty-disjunction? rest-disjuncts)
+      frames
+      (iter (rest-disjuncts rest-disjuncts) (qeval (first-disjunct rest-disjuncts))))) ;; to keep separate then merge at end
+  (apply amb (iter disjuncts)))
 
 ;;(put 'or 'qeval disjoin)
 
@@ -152,17 +167,22 @@
 ;;;SECTION 4.4.4.3
 ;;;Finding Assertions by Pattern Matching
 
-(define (find-assertions pattern frame)
-  (stream-flatmap (lambda (datum)
-                    (check-an-assertion datum pattern frame))
-                  (fetch-assertions pattern frame)))
+(define (get-amb-assertions)
+  (define (iter assertions)
+    (if (null? assertions)
+      (amb)
+      (amb (car assertions) (iter (cdr assertions)))))
+  (iter (get-all-assertions)))
 
-(define (check-an-assertion assertion query-pat query-frame)
+(define (find-assertions pattern)
+    (check-an-assertion (get-amb-assertions) pattern))
+
+(define (check-an-assertion assertion query-pat)
   (let ((match-result
-         (pattern-match query-pat assertion query-frame)))
+         (pattern-match query-pat assertion '())))
     (if (eq? match-result 'failed)
-        the-empty-stream
-        (singleton-stream match-result))))
+        (amb)
+        match-result)))
 
 (define (pattern-match pat dat frame)
   (cond ((eq? frame 'failed) 'failed)
@@ -185,21 +205,26 @@
 ;;;SECTION 4.4.4.4
 ;;;Rules and Unification
 
-(define (apply-rules pattern frame)
-  (stream-flatmap (lambda (rule)
-                    (apply-a-rule rule pattern frame))
-                  (fetch-rules pattern frame)))
+(define (get-amb-rules)
+  (define (iter rules)
+    (if (null? rules)
+      (amb)
+      (amb (car rules) (iter (cdr rules)))))
+  (iter (get-all-rules)))
 
-(define (apply-a-rule rule query-pattern query-frame)
+(define (apply-rules pattern)
+  (apply-a-rule (get-amb-rules) pattern))
+
+(define (apply-a-rule rule query-pattern)
   (let ((clean-rule (rename-variables-in rule)))
     (let ((unify-result
            (unify-match query-pattern
                         (conclusion clean-rule)
-                        query-frame)))
+                        '())))
       (if (eq? unify-result 'failed)
-          the-empty-stream
+          (amb)
           (qeval (rule-body clean-rule)
-                 (singleton-stream unify-result))))))
+                 unify-result)))))
 
 (define (rename-variables-in rule)
   (let ((rule-application-id (new-rule-application-id)))
@@ -258,7 +283,7 @@
 ;;;SECTION 4.4.4.5
 ;;;Maintaining the Data Base
 
-(define THE-ASSERTIONS the-empty-stream)
+(define THE-ASSERTIONS '())
 
 (define (fetch-assertions pattern frame)
   (if (use-index? pattern)
@@ -268,13 +293,13 @@
 (define (get-all-assertions) THE-ASSERTIONS)
 
 (define (get-indexed-assertions pattern)
-  (get-stream (index-key-of pattern) 'assertion-stream))
+  (get-list (index-key-of pattern) 'assertion-list))
 
-(define (get-stream key1 key2)
+(define (get-list key1 key2)
   (let ((s (get key1 key2)))
-    (if s s the-empty-stream)))
+    (if s s '())))
 
-(define THE-RULES the-empty-stream)
+(define THE-RULES '())
 
 (define (fetch-rules pattern frame)
   (if (use-index? pattern)
@@ -285,8 +310,8 @@
 
 (define (get-indexed-rules pattern)
   (stream-append
-   (get-stream (index-key-of pattern) 'rule-stream)
-   (get-stream '? 'rule-stream)))
+   (get-list (index-key-of pattern) 'rule-list)
+   (get-list '? 'rule-list)))
 
 (define (add-rule-or-assertion! assertion)
   (if (rule? assertion)
@@ -297,35 +322,35 @@
   (store-assertion-in-index assertion)
   (let ((old-assertions THE-ASSERTIONS))
     (set! THE-ASSERTIONS
-          (cons-stream assertion old-assertions))
+          (cons assertion old-assertions))
     'ok))
 
 (define (add-rule! rule)
   (store-rule-in-index rule)
   (let ((old-rules THE-RULES))
-    (set! THE-RULES (cons-stream rule old-rules))
+    (set! THE-RULES (cons rule old-rules))
     'ok))
 
 (define (store-assertion-in-index assertion)
   (if (indexable? assertion)
       (let ((key (index-key-of assertion)))
-        (let ((current-assertion-stream
-               (get-stream key 'assertion-stream)))
+        (let ((current-assertion-list
+               (get-list key 'assertion-list)))
           (put key
-               'assertion-stream
-               (cons-stream assertion
-                            current-assertion-stream))))))
+               'assertion-list
+               (cons assertion
+                            current-assertion-list))))))
 
 (define (store-rule-in-index rule)
   (let ((pattern (conclusion rule)))
     (if (indexable? pattern)
         (let ((key (index-key-of pattern)))
-          (let ((current-rule-stream
-                 (get-stream key 'rule-stream)))
+          (let ((current-rule-list
+                 (get-list key 'rule-list)))
             (put key
-                 'rule-stream
-                 (cons-stream rule
-                              current-rule-stream)))))))
+                 'rule-list
+                 (cons rule
+                              current-rule-list)))))))
 
 (define (indexable? pat)
   (or (constant-symbol? (car pat))
@@ -567,8 +592,8 @@
 (define (initialize-data-base rules-and-assertions)
   (define (deal-out r-and-a rules assertions)
     (cond ((null? r-and-a)
-           (set! THE-ASSERTIONS (list->stream assertions))
-           (set! THE-RULES (list->stream rules))
+           (set! THE-ASSERTIONS assertions)
+           (set! THE-RULES rules)
            'done)
           (else
            (let ((s (query-syntax-process (car r-and-a))))

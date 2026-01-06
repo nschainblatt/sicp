@@ -28,7 +28,13 @@
 ;; of eval overrides the definition from 4.1.1
 (load "ch4-mceval.scm")
 
-
+(define (println . args)
+  (newline)
+  (define (init a)
+    (if (null? a)
+      'done
+      (begin (display (car a)) (display " ") (init (cdr a)))))
+  (init args))
 
 ;;;Code from SECTION 4.3.3, modified as needed to run it
 
@@ -268,6 +274,11 @@
 ;;  support for Prime?); integer? and sqrt for exercise code;
 ;;  eq? for ex. solution
 
+(define (our-or a b)
+  (or a b))
+(define (our-and a b)
+  (and a b))
+
 (define primitive-procedures
   (list (list 'car car)
         (list 'cdr cdr)
@@ -299,8 +310,17 @@
         (list 'error error)
         (list 'string->symbol string->symbol)
         (list 'string-length string-length)
+        (list 'apply apply)
+        (list 'assoc assoc)
+        (list 'set-cdr! set-cdr!)
+        (list 'or our-or)
+        (list 'and our-and)
+        (list 'cadr cadr)
+        (list 'equal? equal?)
+        (list 'println println)
 ;;      more primitives
         ))
+
 
 (define (load-query-system)
   (let ((port (open-input-file "ch4-query.scm")))
@@ -317,14 +337,7 @@
                (iter (read port)))))
     (iter (read port))))
 
-(define (start-query-system)
-  (ambeval '(query-driver-loop)
-           the-global-environment
-           ;; ambeval success
-           (lambda (val next-alternative)
-             'done)
-           ;; ambeval failure
-           (lambda () (driver-loop)))
+(define (initialize-database)
   (ambeval '(initialize-data-base microshaft-data-base)
            the-global-environment
            ;; ambeval success
@@ -333,7 +346,35 @@
            ;; ambeval failure
            (lambda () (driver-loop))))
 
+(define (start-query-system)
+  (define (internal-loop try-again)
+    (newline)
+    (display "Enter try-again to try another alternative for the current query, or anything else to start a new query")
+    (newline)
+    (let ((input (read)))
+      (if (eq? input 'try-again)
+        (try-again)
+        (begin
+          (newline)
+          (display ";;; Starting a new query ")
+          (ambeval '(query-driver-loop)
+                   the-global-environment
+                   ;; ambeval success
+                   (lambda (val next-alternative)
+                     (announce-output output-prompt)
+                     (user-print val)
+                     (internal-loop next-alternative))
+                   ;; ambeval failure
+                   (lambda () (announce-output
+                                "No more values for query")
+                     (start-query-system)))))))
+  (internal-loop (lambda ()
+                   (newline)
+                   (display ";;; There is no current query")
+                   (driver-loop))))
+
 
 (define the-global-environment (setup-environment))
 (load-query-system)
+(initialize-database)
 (start-query-system)
