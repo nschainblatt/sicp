@@ -291,5 +291,26 @@
 ;;      more primitives
         ))
 
+(define (load-query-system)
+  (let ((port (open-input-file "ch4-query.scm")))
+    (define (iter exp)
+      (newline)
+      (display exp)
+      (if (eof-object? exp)
+        'done
+        (begin (ambeval exp 
+                        the-global-environment
+                        ;; ambeval success
+                        (lambda (val next-alternative)
+                          'done)
+                        ;; ambeval failure
+                        (lambda () (driver-loop)))
+               (iter (read port)))))
+    (iter (read port))))
+
 
 'AMB-EVALUATOR-LOADED
+
+(define the-global-environment (setup-environment))
+(load-query-system)
+(driver-loop)
