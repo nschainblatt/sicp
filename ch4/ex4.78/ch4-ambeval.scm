@@ -305,8 +305,6 @@
 (define (load-query-system)
   (let ((port (open-input-file "ch4-query.scm")))
     (define (iter exp)
-      (newline)
-      (display exp)
       (if (eof-object? exp)
         'done
         (begin (ambeval exp 
@@ -319,9 +317,23 @@
                (iter (read port)))))
     (iter (read port))))
 
+(define (start-query-system)
+  (ambeval '(query-driver-loop)
+           the-global-environment
+           ;; ambeval success
+           (lambda (val next-alternative)
+             'done)
+           ;; ambeval failure
+           (lambda () (driver-loop)))
+  (ambeval '(initialize-data-base microshaft-data-base)
+           the-global-environment
+           ;; ambeval success
+           (lambda (val next-alternative)
+             'done)
+           ;; ambeval failure
+           (lambda () (driver-loop))))
 
-'AMB-EVALUATOR-LOADED
 
 (define the-global-environment (setup-environment))
 (load-query-system)
-(driver-loop)
+(start-query-system)
