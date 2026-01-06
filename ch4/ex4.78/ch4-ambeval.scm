@@ -288,6 +288,17 @@
         (list 'integer? integer?)
         (list 'sqrt sqrt)
         (list 'eq? eq?)
+        (list 'newline newline)
+        (list 'display display)
+        (list 'read read)
+        (list 'pair? pair?)
+        (list 'symbol? symbol?)
+        (list 'symbol->string symbol->string)
+        (list 'string=? string=?)
+        (list 'substring substring)
+        (list 'error error)
+        (list 'string->symbol string->symbol)
+        (list 'string-length string-length)
 ;;      more primitives
         ))
 
