@@ -122,6 +122,9 @@
 ;; 2. The first clause is attempted with all database entries, that frame is used to instantiate the original compound query.
 ;; 3. Inputting try-again will attempt subsequent database entries with the first clause.
 ;; 4. Once those options are exhausted, the next clause is tried in the same fashion.
+;; Another example:
+;; With negate, if the query produces values, we run (amb), which if the negation was used in a disjoin query
+;; then we would try the next clause.
 ;; NOTE: there is no actual frame merging going on in the original query evaluator. This causes variables to remain unbound if they are not shared in
 ;; each of the clauses.
 ;; For example:
@@ -139,14 +142,10 @@
 
 ;;;Filters
 
-(define (negate operands frame-stream)
-  (stream-flatmap
-   (lambda (frame)
-     (if (stream-null? (qeval (negated-query operands)
-                              (singleton-stream frame)))
-         (singleton-stream frame)
-         the-empty-stream))
-   frame-stream))
+(define (negate operands frame)
+  (if (null? (qeval (negated-query operands) frame))
+    frame
+    (amb)))
 
 ;;(put 'not 'qeval negate)
 
