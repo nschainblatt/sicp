@@ -195,7 +195,9 @@
           succeed
           fail))
         (else
+          (println "DEBUG:")
           (pp succeed)
+          (println "DEBUG:")
           (pp fail)
          (error
           "Unknown procedure type -- EXECUTE-APPLICATION"
