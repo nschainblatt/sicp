@@ -322,6 +322,8 @@
         (list 'number? number?)
         (list 'cddr cddr)
         (list 'caddr caddr)
+        (list 'eval eval)
+        (list 'setup-environment setup-environment)
 ;;      more primitives
         ))
 

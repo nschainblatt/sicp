@@ -150,23 +150,21 @@
 
 ;;(put 'not 'qeval negate)
 
-(define (lisp-value call frame-stream)
-  (stream-flatmap
-   (lambda (frame)
+(define (lisp-value call frame)
      (if (execute
           (instantiate
            call
            frame
            (lambda (v f)
              (error "Unknown pat var -- LISP-VALUE" v))))
-         (singleton-stream frame)
-         the-empty-stream))
-   frame-stream))
+       frame
+       (amb)))
+
 
 ;;(put 'lisp-value 'qeval lisp-value)
 
 (define (execute exp)
-  (apply (eval (predicate exp) user-initial-environment)
+  (apply (eval (predicate exp) (setup-environment))
          (args exp)))
 
 (define (always-true ignore frame-stream) frame-stream)
