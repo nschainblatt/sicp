@@ -318,6 +318,8 @@
         (list 'cadr cadr)
         (list 'equal? equal?)
         (list 'println println)
+        (list 'string-append string-append)
+        (list 'number? number?)
 ;;      more primitives
         ))
 

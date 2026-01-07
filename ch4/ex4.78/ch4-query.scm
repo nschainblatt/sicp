@@ -69,7 +69,7 @@
            (display output-prompt)
            ;; [extra newline at end] (announce-output output-prompt)
            (newline)
-           (display (instantiate q (qeval q) (lambda (v f)
+           (display (instantiate q (qeval q '()) (lambda (v f)
                               (contract-question-mark v))))
            ))))
 
@@ -89,17 +89,16 @@
 ;;;SECTION 4.4.4.2
 ;;;The Evaluator
 
-(define (qeval query)
+(define (qeval query frame)
   (let ((qproc (get (type query) 'qeval)))
     (if qproc
-        (qproc (contents query) '())
-        (simple-query query))))
+        (qproc (contents query) frame)
+        (simple-query query frame))))
 
 ;;;Simple queries
 
-;; TODO: temporarily always returning both the first assertion and rule that works.
-(define (simple-query query-pattern)
-  (find-assertions query-pattern))
+(define (simple-query query-pattern frame)
+  (find-assertions query-pattern frame))
 
 ;; TODO: (apply-rules query-pattern)
 
@@ -109,22 +108,34 @@
   (if (empty-conjunction? conjuncts)
       frame
       (conjoin (rest-conjuncts conjuncts)
-               (qeval (first-conjunct conjuncts)))))
+               (qeval (first-conjunct conjuncts) frame))))
 
 ;;(put 'and 'qeval conjoin)
 
 
-;; Uses AMB to return the first valid frame in the 'or' clauses. Try again will find the next match, until no more.
-;; This is required for disjoin and not conjoin since or has a independent frame for each clause until the end. So each clause
-;; could potentially have it's own valid choice. Try again will try another option for or until no more. Then the outer query
-;; will try a new path at the root amb.
-;; FIXME:
+;; Disjoin uses amb (an additional usage to the one that processes the internal queries) because according to the specification
+;; in the book, or clauses are to be evaluated with the original frame independently of each other. This allows each clause to have it's own
+;; output frame, having different values for the variables used to instantiate the original query.
+;; Supplying try-again will go through all database assertions and rules that pass the first clause in the or. This first suite of try-agains hit the amb within
+;; the simple-query processor. When those options are exhausted, the amb usage in this disjoin procedure tries the next clause, again trying each database entry
+;; for this clause.
+;; So the order is:
+;; 1. Enter a disjoin query
+;; 2. The first clause is attempted with all database entries, that frame is used to instantiate the original compound query.
+;; 3. Inputting try-again will attempt subsequent database entries with the first clause.
+;; 4. Once those options are exhausted, the next clause is tried in the same fashion.
+;; NOTE: there is no actual frame merging going on in the original query evaluator. This causes variables to remain unbound if they are not shared in
+;; each of the clauses.
+;; For example:
+;; (or (job ?x ?y) (job ?x ?a))
+;; Produces some results where non-shared variables are unbound in output:
+;; (or (job (bitdiddle ben) ?y) (job (bitdiddle ben) (computer wizard)))
 (define (disjoin disjuncts frame)
-  (define (iter rest-disjuncts frames)
+  (define (eval-all-disjuncts rest-disjuncts)
     (if (empty-disjunction? rest-disjuncts)
-      frames
-      (iter (rest-disjuncts rest-disjuncts) (qeval (first-disjunct rest-disjuncts))))) ;; to keep separate then merge at end
-  (apply amb (iter disjuncts)))
+      (amb)
+      (amb (qeval (first-disjunct rest-disjuncts) frame) (eval-all-disjuncts (rest-disjuncts rest-disjuncts)))))
+  (eval-all-disjuncts disjuncts))
 
 ;;(put 'or 'qeval disjoin)
 
@@ -174,12 +185,12 @@
       (amb (car assertions) (iter (cdr assertions)))))
   (iter (get-all-assertions)))
 
-(define (find-assertions pattern)
-    (check-an-assertion (get-amb-assertions) pattern))
+(define (find-assertions pattern frame)
+    (check-an-assertion (get-amb-assertions) pattern frame))
 
-(define (check-an-assertion assertion query-pat)
+(define (check-an-assertion assertion query-pat frame)
   (let ((match-result
-         (pattern-match query-pat assertion '())))
+         (pattern-match query-pat assertion frame)))
     (if (eq? match-result 'failed)
         (amb)
         match-result)))
