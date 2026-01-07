@@ -98,7 +98,7 @@
 ;;;Simple queries
 
 (define (simple-query query-pattern frame)
-  (amb (find-assertions query-pattern frame) (apply-rules query-pattern)))
+  (amb (find-assertions query-pattern frame) (apply-rules query-pattern frame)))
 
 ;;;Compound queries
 
@@ -219,15 +219,15 @@
       (amb (car rules) (iter (cdr rules)))))
   (iter (get-all-rules)))
 
-(define (apply-rules pattern)
-  (apply-a-rule (get-amb-rules) pattern))
+(define (apply-rules pattern frame)
+  (apply-a-rule (get-amb-rules) pattern frame))
 
-(define (apply-a-rule rule query-pattern)
+(define (apply-a-rule rule query-pattern frame)
   (let ((clean-rule (rename-variables-in rule)))
     (let ((unify-result
            (unify-match query-pattern
                         (conclusion clean-rule)
-                        '())))
+                        frame)))
       (if (eq? unify-result 'failed)
           (amb)
           (qeval (rule-body clean-rule)
