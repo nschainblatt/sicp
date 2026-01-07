@@ -195,9 +195,13 @@
           succeed
           fail))
         (else
+          (pp succeed)
+          (pp fail)
          (error
           "Unknown procedure type -- EXECUTE-APPLICATION"
-          proc))))
+          'Procedure: proc
+          'Arguments: args
+          ))))
 
 ;;;amb expressions
 
