@@ -320,6 +320,8 @@
         (list 'println println)
         (list 'string-append string-append)
         (list 'number? number?)
+        (list 'cddr cddr)
+        (list 'caddr caddr)
 ;;      more primitives
         ))
 

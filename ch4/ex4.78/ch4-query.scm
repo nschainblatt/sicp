@@ -21,7 +21,7 @@
 ;;    - Update all usages of transformers (e.g. cons-stream) to use the AMB evaluator (point of this exercise and the fact that you can't use transformers as an expressions)
 ;;       - Why were streams used? To obtain all possible matches with easy ability to filter out mismatched.
 ;;       - How can we replace streams with AMB? AMB can be used instead of streams.
-;;          We could simply place all database assertions and rules inside of the AMB expression (interleaves so we don't just get assertions and then rules, todo).
+;;          We could simply place all database assertions and rules inside of the AMB expression.
 ;;          AMB will do the work for us by trying each choice until the first one that works. That will be returned and printed.
 ;;          Try again will allow the AMB to continue and try the next choice, until it gets another that matches. Prints that one and continues.
 ;;       - Are there any other AMB usages we need to replace the functionality of streams? Such as filtering or something similar?
@@ -98,9 +98,7 @@
 ;;;Simple queries
 
 (define (simple-query query-pattern frame)
-  (find-assertions query-pattern frame))
-
-;; TODO: (apply-rules query-pattern)
+  (amb (find-assertions query-pattern frame) (apply-rules query-pattern)))
 
 ;;;Compound queries
 
