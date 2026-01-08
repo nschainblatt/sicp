@@ -132,10 +132,11 @@
 ;; Produces some results where non-shared variables are unbound in output:
 ;; (or (job (bitdiddle ben) ?y) (job (bitdiddle ben) (computer wizard)))
 (define (disjoin disjuncts frame)
-  (define (eval-all-disjuncts rest-disjuncts)
-    (if (empty-disjunction? rest-disjuncts)
+  (define (eval-all-disjuncts disjuncts)
+    (if (empty-disjunction? disjuncts)
       (amb)
-      (amb (qeval (first-disjunct rest-disjuncts) frame) (eval-all-disjuncts (rest-disjuncts rest-disjuncts)))))
+                                                         ;; in analyze-amb, maybe this is being analyzed as an application?
+      (amb (qeval (first-disjunct disjuncts) frame) (eval-all-disjuncts (rest-disjuncts disjuncts)))))
   (eval-all-disjuncts disjuncts))
 
 ;;(put 'or 'qeval disjoin)
