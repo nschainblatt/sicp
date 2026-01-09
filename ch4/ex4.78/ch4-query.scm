@@ -71,6 +71,7 @@
            (newline)
            (display (instantiate q (qeval q '()) (lambda (v f)
                               (contract-question-mark v))))
+           'done
            ))))
 
 (define (instantiate exp frame unbound-var-handler)
