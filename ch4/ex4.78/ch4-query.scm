@@ -144,10 +144,21 @@
 
 ;;;Filters
 
+;; Negate is slightly more complex as it needs to use (amb) when a match exists to signal this frame matches
+;; the negate predicate.
+;; However, because we must use qeval to know if a match exists, and qeval will call (amb) when
+;; no match exists (basically the reverse of what we want) we have to wrap it in a if-fail.
+;; Inside if-fail we have to assign a flag to know when a match is found, so we can call our of (amb)
+;; in the last predicate to fetch a new frame to try.
+;; The reason we have two occurrences of (amb) here is the first one inside if-fail is used to signal
+;; the failure expression to be evaluated, and the second (amb) inside the failure expression is used
+;; to get the next frame.
+;; This is all to handle the fact that we need to know when qeval fails, so we can return the frame
+;; passing the negate.
 (define (negate operands frame)
-  (if (null? (qeval (negated-query operands) frame))
-    frame
-    (amb)))
+  (let ((match-exists? false))
+    (if-fail (begin (qeval (negated-query operands) frame) (permanent-set! match-exists? true) (amb))
+             (if match-exists? (amb) frame))))
 
 ;;(put 'not 'qeval negate)
 

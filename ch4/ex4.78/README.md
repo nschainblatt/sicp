@@ -28,3 +28,5 @@ the system to ignore this frame and to get the next one. This
 would cause a problem because it would backtrack to our new
 wrapping amb and return null, allowing the qeval with results
 to pass the negate which ruins the purpose of negate.
+
+-- Update, I ended up fixing my negate implementation to use if-fail.

@@ -49,8 +49,10 @@
         ((quoted? exp) (analyze-quoted exp))
         ((variable? exp) (analyze-variable exp))
         ((assignment? exp) (analyze-assignment exp))
+        ((permanent-assignment? exp) (analyze-permanent-assignment exp))
         ((definition? exp) (analyze-definition exp))
         ((if? exp) (analyze-if exp))
+        ((if-fail? exp) (analyze-if-fail exp))
         ((lambda? exp) (analyze-lambda exp))
         ((begin? exp) (analyze-sequence (begin-actions exp)))
         ((cond? exp) (analyze (cond->if exp)))
@@ -101,6 +103,37 @@
                    (cproc env succeed fail2)
                    (aproc env succeed fail2)))
              ;; failure continuation for evaluating the predicate
+             fail))))
+
+(define (if-fail? exp)
+  (tagged-list? exp 'if-fail))
+(define (if-fail-success exp)
+  (cadr exp))
+(define (if-fail-failure exp)
+  (caddr exp))
+(define (analyze-if-fail exp)
+  (let ((first (analyze (if-fail-success exp)))
+        (second (analyze (if-fail-failure exp))))
+    (lambda (env succeed fail)
+      (first env
+             (lambda (first-val fail2)
+               (succeed first-val fail2))
+             (lambda () 
+               (second env
+                       (lambda (second-val fail3)
+                         (succeed second-val fail3))
+                       fail))))))
+
+(define (permanent-assignment? exp)
+  (tagged-list? exp 'permanent-set!))
+(define (analyze-permanent-assignment exp)
+  (let ((var (assignment-variable exp))
+        (vproc (analyze (assignment-value exp))))
+    (lambda (env succeed fail)
+      (vproc env
+             (lambda (val fail2) ; *1*
+               (set-variable-value! var val env)
+               (succeed 'ok fail2))
              fail))))
 
 (define (analyze-sequence exps)
@@ -364,7 +397,7 @@
     (display "Enter try-again to try another alternative for the current query, or anything else to start a new query")
     (newline)
     (let ((input (read)))
-      (if (eq? input 'try-again)
+      (if (eq? input 'a)
         (try-again)
         (begin
           (newline)
