@@ -1,66 +1,28 @@
 ;; Exercise 4.79
 ;; 1. Implement for the query language a rule-application method that uses environments rather than renaming.
 ;;    Solution:
-;;    There isn't a 'global environment' we must start from. So for the highest level rule application in a query
-;;    (highest level meaning it is called from the query, not within another rule) it will start with a empty environment.
-;;    Then, if subsequent rules are used within that main rule, applying those will extend this initial environment.
+;;     - Rules now hold the environments they were defined in. This will either be a empty environment if defined globally, or
+;;       the surrounding rule if defined within a rule.
+;;     - Input variables are now tagged with a unique ID instead of the rule variables, this prevents name collisions between
+;;       input variables and rule variables. This is required because the input variables must exist in a related frame in order
+;;       to instantiate later, in other words, they cannot be in their own environment like with rules.
+;;     - When applying a rule, we perform unification like normal, however we extract any non-relevant bindings from the result.
+;;       relevant bindings are ones in the rule conclusion. So they contain the input variables (for instantiation), variable to
+;;       variable bindings for the input to conclusion, as well as variable to value for those conclusion variables (if they exist
+;;       in the surrounding frame.)
+;;       This is all to mimick what happens when a procedure is applied in the regular evaluator: evaluate the arguments to bind their
+;;       values to the procedure variables of the procedure definition.
+;;     - We then apply the rule with this modified frame
+;;     - Input variables are kept in the frames in order for instantiation to work, as this is completely different from applying
+;;       a regular procedure in scheme.
 ;;
-;;    This starting point can be in apply-rules, since this is searching for rules in the database that match the query pattern
-;;    being evaluated.
-;;
-;;    However, since the body of the main rule can be queries involving other rules, and we have to evaluate this with qeval, that
-;;    means we must pass the current environment to qeval for subsequent rule evaluations.
-
-;;    This means the starting environment must come from the first call to qeval. Then as we encounter different rules we extend it.
-;;    If two rules are at the same level in the query, they extend separately, keeping their state separate to avoid conflicts.
-;;
-;;    Plan:
-;;    Place a initial empty environment in the first call to qeval in the driver loop.
-;;    Then when we check for rules to apply, and we find one, we extend and pass this extended environment to the rule applier.
-;;    The rule applier is responsible for placing variables in the local environment to use during evaluation.
-;;    This means we must attach a environment to every rule, so it can be passed around with it.
-;;    This means we also have to update how rules are applied to use the envirnomnet and parent environment attached.
-;;
-;;    Maybe the frame is the environment, and when we qeval the rule body we must pass an 'extended' frame to act as our extended
-;;    environment?
-;;
-;;    TODO:
-;;    1. Update apply-a-rule:
-;;         - Remove the cleaning of variables (remove the IDs)
-;;         - When evaluating the body of the rule, extend the frame and pass this instead of the current
-;;         - This way when nested rules are called that have the same parameter names, they don't overwrite the existing
-;;           ones because they are in their own frame.
-;;         - But it is extended so that the nested rules may lookup a variable in a parent scope, such as if a rule was defined
-;;           within an enclosing scope.
-;;    2. Update binding-in-frame to make use of these environments instead of only lookin in the current frame. We will have
-;;       to allow this procedure to look in parent environments for a value if it doesn't exist in the current.
-;;         - This allows instantiate to remain the same since it uses binding-in-frame
-;;
-;;    FIXME:
-;;   I've implemented all todos, but the part that is broken is that the pattern matcher or the unifier is failing becuase
-;;   it's using a value from the parent environment (the unification variable to variable value for the rule conclusion) to
-;;   put that value as the one in the inner query. We either need to try again when this happens to find a matching value, or
-;;   make sure that it doesn't search in the parent environment when it shouldn't, such as when getting a query variable.
-;;   Note that this may be apart of the second part of this question regarding blocked scope.
-;;   So a temporary solution could be to disallow queries from using parent scope, and only allow rule to do so.
-;;   We would need a new procedure to look up binding values only for the current scope and use them in the pattern matcher
-;;   while continuing to allow the unifier and maybe the instantiator to use all scopes.
-;;   I don't think this would work because some queries require the use of variables from teh rule conclusion, while some
-;;   use new variables not in the rule conclusion that must have new values.
-;;   Basically this entire thing is failing because I used a input variable ?x in (wheel ?x) instead of using a unique one (wheel ?xyz)
-;;   It thinkgs ?x is always bound to ?person, so that any query/rule that uses variable ?x will automatically use the value for the rule  too, which will likely fail unification.
-;;   The original verion with the unique numbers wouldn't place the numbers on the input variables, only on the variables created or used in rules. Maybe the issue can be resolved by completely separating the input variables from the rest?
-
-;; FIXME:
-;;   Read above fixme.
-;;   Maybe we could do something like "if the current variable value doesn't pass, and it's in an outer scope, then try with a new value and insert into the current frame"?
-     
-;; ALSO MIGHT JUST BE EASIER TO RESTART
-;;    
-
 ;;
 ;; 2.  See if you can build on your environment structure to create constructs in the query language for dealing
 ;;     with large systems, such as the rule analog of block-structured procedures.
+;;     I think this would involve creating a base environment for every rule, allowing rules to be defined within rules
+;;     and then calling them from within rules. So when a rule is created, it gets an environment and extends whichever environment
+;;     it was defined in.
+;;
 ;;
 ;; 3. Can you relate any of this to the problem of making deductions in a context (e.g., “If I supposed that P were true,
 ;;    then I would be able to deduce A and B.”) as a method of problem solving? (This problem is open-ended. A good answer
@@ -91,28 +53,31 @@
 
 (define (query-driver-loop)
   (prompt-for-input input-prompt)
-  (let ((q (query-syntax-process (read))))
-    (cond ((assertion-to-be-added? q)
-           (add-rule-or-assertion! (add-assertion-body q))
-           (newline)
-           (display "Assertion added to data base.")
-           (query-driver-loop))
-          (else
-           (newline)
-           (display output-prompt)
-           ;; [extra newline at end] (announce-output output-prompt)
-           (newline)
-           (display (instantiate q (qeval q the-empty-frame) (lambda (v f)
-                              (contract-question-mark v))))
-           'done
-           ))))
+  ;; Rename the variables so we know the input variable differs from any rule variables that it may conflict with.
+  (let ((q (rename-variables-in (query-syntax-process (read)))))
+    (newline)
+    (display output-prompt)
+    ;; [extra newline at end] (announce-output output-prompt)
+    (newline)
+    (display (instantiate q (qeval q the-empty-frame) (lambda (v f)
+                                                        (contract-question-mark v))))
+    'done))
+
+(define (rename-variables-in qexp)
+  (let ((rule-application-id (new-rule-application-id)))
+    (define (tree-walk exp)
+      (cond ((var? exp)
+             (make-new-variable exp rule-application-id))
+            ((pair? exp)
+             (cons (tree-walk (car exp))
+                   (tree-walk (cdr exp))))
+            (else exp)))
+    (tree-walk qexp)))
 
 (define (instantiate exp frame unbound-var-handler)
-  (println "FINAL FRAME" frame)
   (define (copy exp)
     (cond ((var? exp)
            (let ((binding (binding-in-frame exp frame)))
-             (println "BINDING" binding)
              (if binding
                  (copy (binding-value binding))
                  (unbound-var-handler exp frame))))
@@ -126,11 +91,12 @@
 ;;;The Evaluator
 
 (define (qeval query frame)
-  (println "QUERY" query "FRAME" frame)
-  (let ((qproc (get (type query) 'qeval)))
-    (if qproc
+  (if (assertion-to-be-added? query)
+    (begin (add-rule-or-assertion! (add-assertion-body query) frame) frame)
+    (let ((qproc (get (type query) 'qeval)))
+      (if qproc
         (qproc (contents query) frame)
-        (simple-query query frame))))
+        (simple-query query frame)))))
 
 ;;;Simple queries
 
@@ -171,7 +137,7 @@
 (define (disjoin disjuncts frame)
   (define (eval-all-disjuncts disjuncts)
     (if (empty-disjunction? disjuncts)
-      (amb)
+      (begin (println "DISJOIN AMB FAILURE") (amb))
                                                          ;; in analyze-amb, maybe this is being analyzed as an application?
       (amb (qeval (first-disjunct disjuncts) frame) (eval-all-disjuncts (rest-disjuncts disjuncts)))))
   (eval-all-disjuncts disjuncts))
@@ -194,7 +160,7 @@
 (define (negate operands frame)
   (let ((match-exists? false))
     (if-fail (begin (qeval (negated-query operands) frame) (permanent-set! match-exists? true) (amb))
-             (if match-exists? (amb) frame))))
+             (if match-exists? (begin (println "NEGATE AMB FAILURE") (amb)) frame))))
 
 ;;(put 'not 'qeval negate)
 
@@ -225,7 +191,7 @@
 (define (get-amb-assertions)
   (define (iter assertions)
     (if (null? assertions)
-      (amb)
+      (begin (println "ASSERTIONS AMB FAILURE") (amb))
       (amb (car assertions) (iter (cdr assertions)))))
   (iter (get-all-assertions)))
 
@@ -236,7 +202,7 @@
   (let ((match-result
          (pattern-match query-pat assertion frame)))
     (if (eq? match-result 'failed)
-        (amb)
+        (begin (println "ASSERTION MATCH FAILURE" assertion query-pat frame) (amb))
         match-result)))
 
 (define (pattern-match pat dat frame)
@@ -263,7 +229,7 @@
 (define (get-amb-rules)
   (define (iter rules)
     (if (null? rules)
-      (amb)
+      (begin (println "AMB RULES AMB FAILURE") (amb))
       (amb (car rules) (iter (cdr rules)))))
   (iter (get-all-rules)))
 
@@ -271,20 +237,38 @@
   (apply-a-rule (get-amb-rules) pattern frame))
 
 (define (apply-a-rule rule query-pattern frame)
-  ;; TODO: not only do we need to extend when we evaluate another rule, but we need to do so whenever we extend a frame
-  ;; even for regular queries. This is because previously all variables in the rule conclusion and body were made unique,
-  ;; so we must extend to gurantee we don't overwrite variable values with the rule body variables (query variables).
-  ;; Actually, i think we just need to keep the rule varaibles completely separate from teh query varaibles, by not including
-  ;; it in the extension here:
-  (let ((unify-result
-          (unify-match query-pattern
-                       (conclusion rule)
-                       frame)))
-    (println "UNIFY RESULT" unify-result)
+  (let ((unify-result (unify-match query-pattern (conclusion rule) frame)))
     (if (eq? unify-result 'failed)
-      (amb)
-      (qeval (rule-body rule)
-             (extend-frame '() unify-result)))))
+      (begin (println "FAILED TO APPLY RULE" rule unify-result) (amb))
+      (let ((relevant-bindings (filter-irrelevant-bindings rule unify-result)))
+        (qeval (rule-body rule) ;; We might need to qeval a sequence, since the rule-body may have other rule definitions now
+               (extend-frame relevant-bindings (rule-frame rule)))))))
+
+(define (filter-irrelevant-bindings rule frame)
+  ;; Gather all variables in the rule
+  ;; Go over every binding in the frame, only keeping those that are in the rule variable list
+  ;; Return the resulting frame
+  (define (get-rule-variables rule-conclusion)
+    (if (null? rule-conclusion)
+      '()
+      (let ((exp (car rule-conclusion)))
+        (if (var? exp)
+          (cons exp (get-rule-variables (cdr rule-conclusion)))
+          (get-rule-variables (cdr rule-conclusion))))))
+
+  (let ((rule-variable-list (get-rule-variables (conclusion rule))))
+    (define (frame-iter binds result-bindings)
+      (if (null? binds)
+        result-bindings
+        (let ((variable (binding-variable (car binds))))
+          (if (or (memq variable rule-variable-list) (input-variable? variable))
+            (frame-iter (cdr binds) (cons (car binds) result-bindings))
+            (frame-iter (cdr binds) result-bindings)))))
+    (frame-iter (bindings frame) '())))
+
+
+(define (input-variable? variable)
+  (number? (cadr variable)))
 
 (define (unify-match p1 p2 frame)
   (cond ((eq? frame 'failed) 'failed)
@@ -362,9 +346,9 @@
    (get-list (index-key-of pattern) 'rule-list)
    (get-list '? 'rule-list)))
 
-(define (add-rule-or-assertion! assertion)
+(define (add-rule-or-assertion! assertion frame)
   (if (rule? assertion)
-      (add-rule! assertion)
+      (add-rule! assertion frame)
       (add-assertion! assertion)))
 
 (define (add-assertion! assertion)
@@ -374,11 +358,12 @@
           (cons assertion old-assertions))
     'ok))
 
-(define (add-rule! rule)
-  (store-rule-in-index rule)
-  (let ((old-rules THE-RULES))
-    (set! THE-RULES (cons rule old-rules))
-    'ok))
+(define (add-rule! rule-statement frame)
+  (let ((rule (make-rule rule-statement frame)))
+    (store-rule-in-index rule)
+    (let ((old-rules THE-RULES))
+      (set! THE-RULES (cons rule old-rules))
+      'ok)))
 
 (define (store-assertion-in-index assertion)
   (if (indexable? assertion)
@@ -445,15 +430,18 @@
 (define (args exps) (cdr exps))
 
 
+(define (make-rule rule frame)
+  ;; place the tag first, remove the tag from the passed rule.
+  (list 'rule (cdr rule) frame))
 (define (rule? statement)
   (tagged-list? statement 'rule))
-
-(define (conclusion rule) (cadr rule))
-
+(define (conclusion rule) (caadr rule))
 (define (rule-body rule)
-  (if (null? (cddr rule))
+  (if (null? (cdadr rule))
       '(always-true)
-      (caddr rule)))
+      (cadadr rule))) ;; if we decide to do a sequence, we will have to change this
+(define (rule-frame rule)
+  (caddr rule))
 
 (define (query-syntax-process exp)
   (map-over-symbols expand-question-mark exp))
@@ -484,10 +472,17 @@
   (set! rule-counter (+ 1 rule-counter))
   rule-counter)
 
+(define (make-new-variable var rule-application-id)
+  (cons '? (cons rule-application-id (cdr var))))
+
 (define (contract-question-mark variable)
   (string->symbol
-    (string-append "?"
-                   (symbol->string (cadr variable)))))
+   (string-append "?" 
+     (if (number? (cadr variable))
+         (string-append (symbol->string (caddr variable))
+                        "-"
+                        (number->string (cadr variable)))
+         (symbol->string (cadr variable))))))
 
 
 ;;;SECTION 4.4.4.8
@@ -582,10 +577,11 @@
           (else
            (let ((s (query-syntax-process (car r-and-a))))
              (cond ((rule? s)
-                    (store-rule-in-index s)
+                    (let ((rule (make-rule s the-empty-frame)))
+                    (store-rule-in-index rule)
                     (deal-out (cdr r-and-a)
-                              (cons s rules)
-                              assertions))
+                              (cons rule rules)
+                              assertions)))
                    (else
                     (store-assertion-in-index s)
                     (deal-out (cdr r-and-a)
@@ -599,7 +595,8 @@
   (put 'not 'qeval negate)
   (put 'lisp-value 'qeval lisp-value)
   (put 'always-true 'qeval always-true)
-  (deal-out rules-and-assertions '() '()))
+  (deal-out rules-and-assertions '() '())
+  (println THE-RULES))
 
 ;; Do following to reinit the data base from microshaft-data-base
 ;;  in Scheme (not in the query driver loop)

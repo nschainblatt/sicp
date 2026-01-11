@@ -363,6 +363,11 @@
         (list 'caddr caddr)
         (list 'eval eval)
         (list 'setup-environment setup-environment)
+        (list 'number->string number->string)
+        (list 'caadr caadr)
+        (list 'cdadr cdadr)
+        (list 'cadadr cadadr)
+        (list 'cdadr cdadr)
 ;;      more primitives
         ))
 
