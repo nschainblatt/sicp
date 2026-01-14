@@ -39,12 +39,12 @@
 ;;      - When found, we cal qeval with the current frame that should have the bindings for the variables used in the conclusion already
 ;;
 ;;       (assert! (rule (kinda-rich ?person)
-;;                      (assert! (inner-rule (house-rich)
-;;                                           (address ?person (Swellesley (Top Heap Road)))))
-;;                      (assert! (inner-rule (money-rich)
+;;                      (inner-rule (house-rich)
+;;                                           (address ?person (Swellesley (Top Heap Road))))
+;;                      (inner-rule (money-rich)
 ;;                                           (and (salary ?person ?amount)
-;;                                                (lisp-value > ?person 50000))))
-;;                      (or (rule (house-rich ?person)) (rule (money-rich ?person)))))
+;;                                                (lisp-value > ?person 50000)))
+;;                      (or (house-rich ?person) (money-rich ?person))))
 ;;
 ;; 3. Can you relate any of this to the problem of making deductions in a context (e.g., “If I supposed that P were true,
 ;;    then I would be able to deduce A and B.”) as a method of problem solving? (This problem is open-ended. A good answer
