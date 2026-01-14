@@ -113,12 +113,22 @@
 ;;;The Evaluator
 
 (define (qeval query frame)
-  (if (assertion-to-be-added? query)
-    (begin (add-rule-or-assertion! (add-assertion-body query) frame) frame)
-    (let ((qproc (get (type query) 'qeval)))
-      (if qproc
-        (qproc (contents query) frame)
-        (simple-query query frame)))))
+  (println "QEVAL" query)
+  (cond ((assertion-to-be-added? query) (add-rule-or-assertion! (add-assertion-body query) frame) frame)
+        ((inner-rule-to-be-added? query) (add-inner-rule! query frame) frame)
+        (else
+          (let ((qproc (get (type query) 'qeval)))
+            (if qproc
+              (qproc (contents query) frame)
+              (simple-query query frame))))))
+
+(define (inner-rule-to-be-added? statement)
+  (tagged-list? statement 'inner-rule))
+
+(define (add-inner-rule! rule-statement frame)
+  (let ((rule (make-inner-rule rule-statement frame)))
+    ;; TODO: check if rule already exists, if so we need to replace it
+    (append! (bindings frame) (list (make-binding (car (conclusion rule)) rule)))))
 
 ;;;Simple queries
 
@@ -263,8 +273,15 @@
     (if (eq? unify-result 'failed)
       (begin (println "FAILED TO APPLY RULE" rule unify-result) (amb))
       (let ((relevant-bindings (filter-irrelevant-bindings rule unify-result)))
-        (qeval (rule-body rule) ;; We might need to qeval a sequence, since the rule-body may have other rule definitions now
+        (qeval-sequence (rule-body rule) ;; We might need to qeval a sequence, since the rule-body may have other rule definitions now
                (extend-frame relevant-bindings (rule-frame rule)))))))
+
+;; Evaluate each query in the sequence independently, similar to an or except we evaluate all queries in the sequence.
+(define (qeval-sequence seq frame)
+  (if (null? (cdr seq))
+    ;; Return the frame of the last evaluated query
+    (qeval (car seq) frame)
+    (begin (qeval (car seq) frame) (qeval-sequence (cdr seq) frame))))
 
 (define (filter-irrelevant-bindings rule frame)
   ;; Gather all variables in the rule
@@ -455,6 +472,8 @@
 (define (make-rule rule frame)
   ;; place the tag first, remove the tag from the passed rule.
   (list 'rule (cdr rule) frame))
+(define (make-inner-rule rule frame)
+  (list 'inner-rule (cdr rule) frame))
 (define (rule? statement)
   (tagged-list? statement 'rule))
 (define (conclusion rule) (caadr rule))
@@ -462,7 +481,7 @@
   (println "RULE" rule)
   (if (null? (cdadr rule))
       '(always-true)
-      (cadadr rule))) ;; if we decide to do a sequence, we will have to change this, we would remove the last car since
+      (cdadr rule))) ;; if we decide to do a sequence, we will have to change this, we would remove the last car since
 (define (rule-frame rule)
   (caddr rule))
 

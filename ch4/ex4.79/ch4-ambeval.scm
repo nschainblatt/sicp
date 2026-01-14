@@ -368,6 +368,7 @@
         (list 'cdadr cdadr)
         (list 'cadadr cadadr)
         (list 'cdadr cdadr)
+        (list 'append! append!)
 ;;      more primitives
         ))
 
