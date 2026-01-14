@@ -19,10 +19,32 @@
 ;;
 ;; 2.  See if you can build on your environment structure to create constructs in the query language for dealing
 ;;     with large systems, such as the rule analog of block-structured procedures.
-;;     I think this would involve creating a base environment for every rule, allowing rules to be defined within rules
-;;     and then calling them from within rules. So when a rule is created, it gets an environment and extends whichever environment
-;;     it was defined in.
+;;     Solution:
+;;      - Implement the ability to have internal rule definitions that are local to the rule that it is defined within.
+;;      - These internal definitions will use assert!, they will not have to be within a compound query, so we have
+;;        to convert our assumption that rule bodies are a single query, they are now going to be a sequence of queries to evaluate.
+;;          - Variables within separate compound queries will not be shared unless they are in the same wrapping query.
+;;          - It is assumed that the last query in the body will return a frame.
+;;      - This would require the environment the outer rule contains to have a binding to these internal rules.
+;;      - The outer rule body would exist in the database like normal, only when we apply this rule will the body be evaluated,
+;;        which is where the internal rule definitions reside.
+;;      - This requires adding a new check to qeval, we would need to separate the standard rule definitions from the internal
+;;        ones so we don't add them to the global database. They should remain local to the rule they were defined in.
+;;          - We could tag inner rule definitions with inner-rule, that way we can handle them differently.
+;;          - Inside the qeval handler for inner-rules we will simply add the inner-rule to the frame passed in, then return that frame
+;;      - With the inner-rule defined in the local frame, we can then call it from the rule body
+;;      - We will have to update simple-query to have another option for checking for inner-rules, however, I will place this option in
+;;        between the exiting assertions and apply-rule options, that way a inner rule has higher precdedence than the global rules.
+;;      - Inside this new option, we search the frame for a matching inner-rule with that name
+;;      - When found, we cal qeval with the current frame that should have the bindings for the variables used in the conclusion already
 ;;
+;;       (assert! (rule (kinda-rich ?person)
+;;                      (assert! (inner-rule (house-rich)
+;;                                           (address ?person (Swellesley (Top Heap Road)))))
+;;                      (assert! (inner-rule (money-rich)
+;;                                           (and (salary ?person ?amount)
+;;                                                (lisp-value > ?person 50000))))
+;;                      (or (rule (house-rich ?person)) (rule (money-rich ?person)))))
 ;;
 ;; 3. Can you relate any of this to the problem of making deductions in a context (e.g., “If I supposed that P were true,
 ;;    then I would be able to deduce A and B.”) as a method of problem solving? (This problem is open-ended. A good answer
@@ -202,7 +224,7 @@
   (let ((match-result
          (pattern-match query-pat assertion frame)))
     (if (eq? match-result 'failed)
-        (begin (println "ASSERTION MATCH FAILURE" assertion query-pat frame) (amb))
+        (amb)
         match-result)))
 
 (define (pattern-match pat dat frame)
@@ -437,9 +459,10 @@
   (tagged-list? statement 'rule))
 (define (conclusion rule) (caadr rule))
 (define (rule-body rule)
+  (println "RULE" rule)
   (if (null? (cdadr rule))
       '(always-true)
-      (cadadr rule))) ;; if we decide to do a sequence, we will have to change this
+      (cadadr rule))) ;; if we decide to do a sequence, we will have to change this, we would remove the last car since
 (define (rule-frame rule)
   (caddr rule))
 
