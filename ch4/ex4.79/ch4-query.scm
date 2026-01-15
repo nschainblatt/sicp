@@ -59,6 +59,8 @@
 ;; 3. Can you relate any of this to the problem of making deductions in a context (e.g., “If I supposed that P were true,
 ;;    then I would be able to deduce A and B.”) as a method of problem solving? (This problem is open-ended. A good answer
 ;;    is probably worth a Ph.D.)
+;;
+;;    I am not really certain what this is asking. Are we to assume that P is made up of A and B, or vice versa?
 
 ;; --- 
 
