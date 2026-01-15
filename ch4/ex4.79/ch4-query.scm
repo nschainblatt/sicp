@@ -21,23 +21,33 @@
 ;;     with large systems, such as the rule analog of block-structured procedures.
 ;;     Solution:
 ;;      - Implement the ability to have internal rule definitions that are local to the rule that it is defined within.
-;;      - These internal definitions will use assert!, they will not have to be within a compound query, so we have
-;;        to convert our assumption that rule bodies are a single query, they are now going to be a sequence of queries to evaluate.
-;;          - Variables within separate compound queries will not be shared unless they are in the same wrapping query.
+;;      - These internal definitions will not use assert! as they will be added to the local frame not the global database.
+;;        They will not have to be within a compound query, so we have to convert our assumption that rule bodies are a single
+;;        query (compound or basic), they are now going to be a sequence of queries to evaluate.
+;;          - Variables within the separate queries in the body will not be shared unless they are in the same compound query.
 ;;          - It is assumed that the last query in the body will return a frame.
-;;      - This would require the environment the outer rule contains to have a binding to these internal rules.
+;;      - This will require the environment the outer rule contains to have a binding to these internal rules.
 ;;      - The outer rule body would exist in the database like normal, only when we apply this rule will the body be evaluated,
 ;;        which is where the internal rule definitions reside.
 ;;      - This requires adding a new check to qeval, we would need to separate the standard rule definitions from the internal
-;;        ones so we don't add them to the global database. They should remain local to the rule they were defined in.
-;;          - We could tag inner rule definitions with inner-rule, that way we can handle them differently.
-;;          - Inside the qeval handler for inner-rules we will simply add the inner-rule to the frame passed in, then return that frame
-;;      - With the inner-rule defined in the local frame, we can then call it from the rule body
-;;      - We will have to update simple-query to have another option for checking for inner-rules, however, I will place this option in
-;;        between the exiting assertions and apply-rule options, that way a inner rule has higher precdedence than the global rules.
+;;        ones so we don't add them to the global database. They should remain local to the rule they were defined in, so we add them
+;;        to the rules frame.
+;;          - I will tag inner rule definitions with inner-rule, that way we can handle them differently.
+;;          - Inside the qeval handler for inner-rule definitions, we will simply add a binding to the inner-rule in the frame
+;;            passed in, then return that frame.
+;;      - With the inner-rule defined in the local frame, we can then call it from the rule body.
+;;          - I will update simple-query to have another option for checking for inner-rules, however, I will place
+;;            this option in between the exiting assertions and apply-rule options, that way a inner rule has higher precedence
+;;            than the global rules.
 ;;      - Inside this new option, we search the frame for a matching inner-rule with that name
-;;      - When found, we cal qeval with the current frame that should have the bindings for the variables used in the conclusion already
+;;          - During definition and when checking for a inner-rule to apply, we will have to transform our inner rule names to a
+;;            variable in the same format as our query variables, like: (? rule-name). This is to stay compatible with the existing
+;;            procedures.
+;;      - When found, we cal qeval-sequence on the rule-body with the current frame that will have the bindings for the variables
+;;        used in the conclusion. Inner rules are evaluated using the same apply-a-rule procedure containing unification like the
+;;        regular rules.
 ;;
+;; Example rule using inner rules:
 ;; (assert! (rule (kinda-rich ?person)
 ;;                       (inner-rule (house-rich ?x)
 ;;                                            (address ?person (Swellesley (Top Heap Road))))
