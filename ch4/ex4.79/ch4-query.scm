@@ -38,13 +38,13 @@
 ;;      - Inside this new option, we search the frame for a matching inner-rule with that name
 ;;      - When found, we cal qeval with the current frame that should have the bindings for the variables used in the conclusion already
 ;;
-;;       (assert! (rule (kinda-rich ?person)
-;;                      (inner-rule (house-rich)
-;;                                           (address ?person (Swellesley (Top Heap Road))))
-;;                      (inner-rule (money-rich)
-;;                                           (and (salary ?person ?amount)
-;;                                                (lisp-value > ?person 50000)))
-;;                      (or (house-rich ?person) (money-rich ?person))))
+;; (assert! (rule (kinda-rich ?person)
+;;                       (inner-rule (house-rich ?x)
+;;                                            (address ?person (Swellesley (Top Heap Road))))
+;;                       (inner-rule (money-rich ?y)
+;;                                            (and (salary ?person ?amount)
+;;                                                 (lisp-value > ?amount 50000)))
+;;                       (or (house-rich ?person) (money-rich ?person))))
 ;;
 ;; 3. Can you relate any of this to the problem of making deductions in a context (e.g., “If I supposed that P were true,
 ;;    then I would be able to deduce A and B.”) as a method of problem solving? (This problem is open-ended. A good answer
@@ -113,7 +113,7 @@
 ;;;The Evaluator
 
 (define (qeval query frame)
-  (println "QEVAL" query)
+  (println "QEVAL" query (type query))
   (cond ((assertion-to-be-added? query) (add-rule-or-assertion! (add-assertion-body query) frame) frame)
         ((inner-rule-to-be-added? query) (add-inner-rule! query frame) frame)
         (else
@@ -128,12 +128,12 @@
 (define (add-inner-rule! rule-statement frame)
   (let ((rule (make-inner-rule rule-statement frame)))
     ;; TODO: check if rule already exists, if so we need to replace it
-    (append! (bindings frame) (list (make-binding (car (conclusion rule)) rule)))))
+    (add-binding! (make-binding (list '? (car (conclusion rule))) rule) frame)))
 
 ;;;Simple queries
 
 (define (simple-query query-pattern frame)
-  (amb (find-assertions query-pattern frame) (apply-rules query-pattern frame)))
+  (amb (find-assertions query-pattern frame) (apply-inner-rules query-pattern frame) (apply-rules query-pattern frame)))
 
 ;;;Compound queries
 
@@ -271,10 +271,25 @@
 (define (apply-a-rule rule query-pattern frame)
   (let ((unify-result (unify-match query-pattern (conclusion rule) frame)))
     (if (eq? unify-result 'failed)
-      (begin (println "FAILED TO APPLY RULE" rule unify-result) (amb))
+      (amb)
       (let ((relevant-bindings (filter-irrelevant-bindings rule unify-result)))
         (qeval-sequence (rule-body rule) ;; We might need to qeval a sequence, since the rule-body may have other rule definitions now
                (extend-frame relevant-bindings (rule-frame rule)))))))
+
+(define (apply-inner-rules pattern frame)
+  (println "CHECKING INNER RULES" (car pattern))
+  (let ((variable (list '? (car pattern))))
+    (let ((binding (binding-in-frame variable frame)))
+      (if binding
+        (begin (println "APPLY INNER RULES" pattern (binding-variable binding)) (apply-a-rule (binding-value binding) pattern frame))
+        (begin (println "INNER RULE AMB FAILURE" (frame-variables frame)) (amb))))))
+
+(define (frame-variables frame)
+  (define (iter binds result)
+    (if (null? binds)
+      result
+      (iter (cdr binds) (cons (binding-variable (car binds)) result))))
+  (iter (bindings frame ) '()))
 
 ;; Evaluate each query in the sequence independently, similar to an or except we evaluate all queries in the sequence.
 (define (qeval-sequence seq frame)
@@ -478,7 +493,6 @@
   (tagged-list? statement 'rule))
 (define (conclusion rule) (caadr rule))
 (define (rule-body rule)
-  (println "RULE" rule)
   (if (null? (cdadr rule))
       '(always-true)
       (cdadr rule))) ;; if we decide to do a sequence, we will have to change this, we would remove the last car since
@@ -552,6 +566,10 @@
 
 (define (bindings frame)
   (car frame))
+(define (set-bindings! new-bindings frame)
+  (set-car! frame new-bindings))
+(define (add-binding! binding frame)
+  (set-bindings! (cons binding (bindings frame)) frame))
 (define (enclosing-frame frame)
   (cdr frame))
 (define (extend-frame bindings frame)

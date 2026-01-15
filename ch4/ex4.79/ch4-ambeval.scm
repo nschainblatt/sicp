@@ -369,6 +369,7 @@
         (list 'cadadr cadadr)
         (list 'cdadr cdadr)
         (list 'append! append!)
+        (list 'set-car! set-car!)
 ;;      more primitives
         ))
 
