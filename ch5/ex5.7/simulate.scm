@@ -29,6 +29,10 @@
     (goto (reg continue))
     expt-done))
 
+(set-register-contents! expt-recursive-machine n 2)
+(set-register-contents! expt-recursive-machine b 2)
+(start expt-recursive-machine)
+(get-register-contents! expt-recursive-machine val)
 
 ; b. Iterative exponentiation:
 (define (expt b n)
@@ -52,3 +56,8 @@
     (assign product (op *) (reg b) (reg product))
     (goto (label expt-loop))
     expt-done))
+
+(set-register-contents! expt-iter-machine n 2)
+(set-register-contents! expt-iter-machine b 2)
+(start expt-iter-machine)
+(get-register-contents! expt-iter-machine product)
