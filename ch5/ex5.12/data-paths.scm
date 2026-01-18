@@ -24,17 +24,21 @@
 ;; the lists you constructed.
 
 ;; Steps:
-;; 1. Make a distinct procedure that will take in a list of something and return a new list of distinct elements
-;; 2. Make a procedure that will sort the key of each item in the given list alphabetically, the key will be a lambda
-;;    to extract the key to sort by. I am assuming alphabetical order but am confused why the exercise says: assign, goto, etc.
-;;    When branch would obviously come before goto?
 ;; 3. Make a filter to get all registers that hold labels (that are used by goto instructions)
 ;;     - I am assuming I can do either to find all possible registers?
+;;     - I will filter for use of registers in goto, since we cannot do assign because what if the source register of an assign
+;;       held a label? We would have to account for that.
+;;       But if we limit to just registers used in goto instructions we can make the search much simpler and only have paths in our
+;;       data-path that are actually used by gotos, not orphaned assignments.
 ;; 4. Make a filter to get all registsers that are saved or restored.
 ;; 5. Get a list of all the sources that are used to write to a register (do for all registers), note that an entire op can be a source.
 ;; 6. Add our procedures to the message passing interface of the machine.
 ;; 7. Test the new message type with the fibonacci machine and paste the output here.
 
+(define (register-label-filter instructions)
+  (distinct (map (lambda (instr) (goto-dest instr))
+		 (filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'goto) (register-exp? (goto-dest instr))))
+			 instructions))))
 
 (define (distinct seq)
   (define (iter rest result)
@@ -395,3 +399,44 @@
 
 (define (tagged-list? exp tag)
   (and (pair? exp) (eq? tag (car exp))))
+
+;; ---
+
+(define test
+  '(controller
+     (assign continue (label fib-done))
+     fib-loop
+     (test (op <) (reg n) (const 2))
+     (branch (label immediate-answer))
+     ;; set up to compute Fib(n  1)
+     (save continue)
+     (assign continue (label afterfib-n-1))
+     (save n) ; save old value of n
+     (assign n (op -) (reg n) (const 1)) ; clobber n to n-1
+     (goto (label fib-loop)) ; perform recursive call
+     afterfib-n-1 ; upon return, val contains Fib(n  1)
+     (restore n)
+     (restore continue)
+     ;; set up to compute Fib(n  2)
+     (assign n (op -) (reg n) (const 2))
+     (save continue)
+     (assign continue (label afterfib-n-2))
+     (save val) ; save Fib(n  1)
+     (goto (label fib-loop))
+     afterfib-n-2 ; upon return, val contains Fib(n  2)
+     (assign n (reg val)) ; n now contains Fib(n  2)
+     (restore val) ; val now contains Fib(n  1)
+     (restore continue)
+     (assign val ; Fib(n  1) + Fib(n  2)
+	     (op +) (reg val) (reg n))
+     (goto (reg continue)) ; return to caller, answer is in
+     val
+     immediate-answer
+     (assign val (reg n)) ; base case: Fib(n) = n
+     (goto (reg continue))
+     ))
+
+(println (register-label-filter test))
+
+;; ---
+
