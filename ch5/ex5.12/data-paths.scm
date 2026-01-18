@@ -24,20 +24,19 @@
 ;; the lists you constructed.
 
 ;; Steps:
-;; 3. Make a filter to get all registers that hold labels (that are used by goto instructions)
-;;     - I am assuming I can do either to find all possible registers?
-;;     - I will filter for use of registers in goto, since we cannot do assign because what if the source register of an assign
-;;       held a label? We would have to account for that.
-;;       But if we limit to just registers used in goto instructions we can make the search much simpler and only have paths in our
-;;       data-path that are actually used by gotos, not orphaned assignments.
-;; 4. Make a filter to get all registsers that are saved or restored.
+;; 4. Make a filter to get all registers that are saved or restored.
 ;; 5. Get a list of all the sources that are used to write to a register (do for all registers), note that an entire op can be a source.
 ;; 6. Add our procedures to the message passing interface of the machine.
 ;; 7. Test the new message type with the fibonacci machine and paste the output here.
 
 (define (register-label-filter instructions)
-  (distinct (map (lambda (instr) (goto-dest instr))
+  (distinct (map (lambda (instr) (register-exp-reg (goto-dest instr)))
 		 (filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'goto) (register-exp? (goto-dest instr))))
+			 instructions))))
+
+(define (register-save-restore-filter instructions)
+  (distinct (map (lambda (instr) (stack-inst-reg-name instr))
+		 (filter (lambda (instr) (and (pair? instr) (or (eq? (car instr) 'save) (eq? (car instr) 'restore))))
 			 instructions))))
 
 (define (distinct seq)
@@ -437,6 +436,7 @@
      ))
 
 (println (register-label-filter test))
+(println (register-save-restore-filter test))
 
 ;; ---
 
