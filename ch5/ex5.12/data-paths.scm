@@ -35,6 +35,47 @@
 ;; 6. Add our procedures to the message passing interface of the machine.
 ;; 7. Test the new message type with the fibonacci machine and paste the output here.
 
+
+(define (distinct seq)
+  (define (iter rest result)
+    (cond ((null? rest) result)
+	  ((member (car rest) result) (iter (cdr rest) result))
+	  (else (iter (cdr rest) (cons (car rest) result)))))
+  (iter seq '()))
+
+(define (sort seq fkey)
+  (define (sort-iter rest result)
+    (cond ((null? rest) result)
+	  ((null? result) (sort-iter (cdr rest) (cons (car rest) result)))
+	  (else (let ((instr-type (fkey (car rest)))
+		      (curr-smallest-instr-type (fkey (car result))))
+		  (if (symbol<=? instr-type curr-smallest-instr-type)
+		    (sort-iter (cdr rest) (cons (car rest) result))
+		    (sort-iter (cdr rest) (insert-instr-in-order (car rest) result)))))))
+  (define (insert-instr-in-order instr seq)
+    (let ((instr-type (fkey instr)))
+      (define (insert-iter rest result)
+	(if (null? rest)
+	  (append result (list instr))
+	  (let* ((curr-instr (car rest))
+		 (curr-instr-type (fkey curr-instr)))
+	    (if (symbol<=? instr-type curr-instr-type)
+	      (append result (cons instr rest))
+	      (insert-iter (cdr rest) (cons curr-instr result))))))
+      (insert-iter seq '())))
+  (sort-iter seq '()))
+
+(define (symbol<=? x y)
+  (or (eq? x y) (symbol<? x y)))
+
+(define (println . args)
+  (newline)
+  (define (iter rest)
+    (if (null? rest)
+      'done
+      (begin (display (car rest)) (display " ") (iter (cdr rest)))))
+  (iter args))
+
 (define (make-machine register-names ops controller-text)
   (let ((machine (make-new-machine)))
     (for-each
