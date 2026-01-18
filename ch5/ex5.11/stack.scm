@@ -58,7 +58,30 @@
 ;; wise, it signals an error. Modify the simulator to be-
 ;; have this way. You will have to change save to put
 ;; the register name on the stack along with the value.
-;;
+
+(define (make-save inst machine stack pc)
+  (let* ((reg-name (stack-inst-reg-name inst))
+	 (reg (get-register machine reg-name)))
+    (lambda ()
+      (push stack (make-reg-pair reg-name (get-contents reg)))
+      (advance-pc pc))))
+
+(define (make-restore inst machine stack pc)
+  (let* ((reg-name (stack-inst-reg-name inst))
+	 (reg (get-register machine reg-name)))
+    (lambda ()
+      (let ((reg-pair (pop stack)))
+	(if (eq? (reg-pair-name reg-pair) reg-name)
+	  (begin (set-contents! reg (reg-pair-contents reg-pair)) (advance-pc pc))
+	  (error "Register name mismatch! --MAKE-RESTORE"))))))
+
+(define (make-reg-pair name contents)
+  (cons name contents))
+(define (reg-pair-name reg-pair)
+  (car reg-pair))
+(define (reg-pair-contents reg-pair)
+  (cdr reg-pair))
+
 ;; c. (restore y) puts into y the last value saved from
 ;; y regardless of what other registers were saved aer
 ;; y and not restored. Modify the simulator to behave
