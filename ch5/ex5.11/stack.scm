@@ -106,10 +106,12 @@
 ;; all while allowing the flexibility of saving and restoring registers not in the exact order as 
 ;; if we had a single stack for all registers.
 
+;; These are all of the procedures that require an update to support the stack-list:
+
 (define (update-insts! insts labels machine)
   (let ((pc (get-register machine 'pc))
 	(flag (get-register machine 'flag))
-	(stack (machine 'stack))
+	(stack-list (machine 'stack-list))
 	(ops (machine 'operations)))
     (for-each
       (lambda (inst)
@@ -117,7 +119,7 @@
 	  inst
 	  (make-execution-procedure
 	    (instruction-text inst)
-	    labels machine pc flag stack ops)))
+	    labels machine pc flag stack-list ops)))
       insts)))
 
 (define (make-execution-procedure
@@ -201,24 +203,31 @@
 			   message))))
       dispatch)))
 
-;; Updated save and restore operations to support the stack-list:
 (define (make-save inst machine stack-list pc)
   (let* ((reg-name (stack-inst-reg-name inst))
-	 (reg (get-register machine reg-name)))
+	 (reg (get-register machine reg-name))
+	 (stack (lookup-reg-stack stack-list reg-name)))
     (lambda ()
-      (push stack-list (make-reg-pair reg-name (get-contents reg)))
+      (push stack (make-reg-pair reg-name (get-contents reg)))
       (advance-pc pc))))
 
 (define (make-restore inst machine stack-list pc)
   (let* ((reg-name (stack-inst-reg-name inst))
-	 (reg (get-register machine reg-name)))
+	 (reg (get-register machine reg-name))
+	 (stack (lookup-reg-stack stack-list reg-name)))
     (lambda ()
-      (let ((reg-pair (pop stack-list)))
+      (let ((reg-pair (pop stack)))
 	(if (eq? (reg-pair-name reg-pair) reg-name)
 	  (begin (set-contents! reg (reg-pair-contents reg-pair)) (advance-pc pc))
 	  (error "Register name mismatch! --MAKE-RESTORE"))))))
 
 ;; Helpers
+(define (lookup-reg-stack stack-list reg-name)
+  (let ((reg-stack (assoc reg-name stack-list)))
+    (if reg-stack
+      (cdr reg-stack)
+      (error "No stack for register with name: " reg-name))))
+
 (define (make-reg-pair name contents)
   (cons name contents))
 (define (reg-pair-name reg-pair)
