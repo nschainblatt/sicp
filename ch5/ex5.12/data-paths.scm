@@ -5,7 +5,6 @@
 ;;
 ;; • a list of all instructions, with duplicates removed, sorted
 ;; by instruction type (assign, goto, and so on);
-;; 717
 ;;
 ;; • a list (without duplicates) of the registers used to hold
 ;; entry points (these are the registers referenced by goto
@@ -23,6 +22,18 @@
 ;; vide access to this new information. To test your analyzer,
 ;; define the Fibonacci machine from Figure 5.12 and examine
 ;; the lists you constructed.
+
+;; Steps:
+;; 1. Make a distinct procedure that will take in a list of something and return a new list of distinct elements
+;; 2. Make a procedure that will sort the key of each item in the given list alphabetically, the key will be a lambda
+;;    to extract the key to sort by. I am assuming alphabetical order but am confused why the exercise says: assign, goto, etc.
+;;    When branch would obviously come before goto?
+;; 3. Make a filter to get all registers that hold labels (that are used by goto instructions)
+;;     - I am assuming I can do either to find all possible registers?
+;; 4. Make a filter to get all registsers that are saved or restored.
+;; 5. Get a list of all the sources that are used to write to a register (do for all registers), note that an entire op can be a source.
+;; 6. Add our procedures to the message passing interface of the machine.
+;; 7. Test the new message type with the fibonacci machine and paste the output here.
 
 (define (make-machine register-names ops controller-text)
   (let ((machine (make-new-machine)))
