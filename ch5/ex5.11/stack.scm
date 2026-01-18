@@ -101,6 +101,10 @@
 ;; we must store all the stacks in a list to allow dynamic allocation of registers
 ;; that aren't always know ahead of time. These stacks will be tagged by the register name
 ;; so we are able to efficiently search for them later on during assembly time.
+;; Note that this assumes the reference we obtain of the right stack during assembly stack, will have
+;; it's contents be the most up to date when we use that reference during simulation time, otherwise
+;; the contents of the registers stack will be out of date, and we will have to move the stack lookup
+;; to simulation time.
 ;; The register stacks are located during assembly time (not in the execution procedures)
 ;; instead of at simulation time to allow the execution speed of the simulation to remain unchanged,
 ;; all while allowing the flexibility of saving and restoring registers not in the exact order as 
