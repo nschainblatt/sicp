@@ -24,7 +24,6 @@
 ;; the lists you constructed.
 
 ;; Steps:
-;; 4. Make a filter to get all registers that are saved or restored.
 ;; 5. Get a list of all the sources that are used to write to a register (do for all registers), note that an entire op can be a source.
 ;; 6. Add our procedures to the message passing interface of the machine.
 ;; 7. Test the new message type with the fibonacci machine and paste the output here.
@@ -46,7 +45,7 @@
 	  (else (iter (cdr rest) (cons (car rest) result)))))
   (iter seq '()))
 
-(define (sort seq fkey)
+(define (my-sort seq fkey)
   (define (sort-iter rest result)
     (cond ((null? rest) result)
 	  ((null? result) (sort-iter (cdr rest) (cons (car rest) result)))
@@ -64,7 +63,7 @@
 		 (curr-instr-type (fkey curr-instr)))
 	    (if (symbol<=? instr-type curr-instr-type)
 	      (append result (cons instr rest))
-	      (insert-iter (cdr rest) (cons curr-instr result))))))
+	      (insert-iter (cdr rest) (append result (list curr-instr)))))))
       (insert-iter seq '())))
   (sort-iter seq '()))
 
