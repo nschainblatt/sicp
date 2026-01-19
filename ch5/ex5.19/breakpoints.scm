@@ -16,6 +16,16 @@
 ;; installs a breakpoint in the gcd-machine just before the assign-
 ;; ment to register a.
 ;;
+;; Solution:
+;; Save the labels similar to how we save the instruction sequence inside the machine.
+;; When we encounter a request to add a breakpoint, we will search through the labels
+;; and use the n offset to find the right instruction.
+;; We will modify the instruction to be marked that it has a breakpoint.
+;; We are able to modify the instruction in the label list because it is the same reference
+;; stored in the instruction sequence, so updating one will update the other.
+;; We also will not have  to reload the pc register since it also shares the same reference, in other
+;; words, the machine will not have to be restarted to get a breakpoint after the machine has already started.
+;;
 ;; b.
 ;; When the simulator reaches the breakpoint it should
 ;; print the label and the offset of the break-
@@ -23,16 +33,39 @@
 ;; get-register-contents and set-register-contents! to
 ;; manipulate the state of the simulated machine.
 ;;
+;; Solution:
+;; Store a breakpoint boolean as the fourth item in a instruction (after the optional label).
+;; Then, in the execute procedure, we will check if the current instruction has a breakpoint, if so we pause execution
+;; giving an environment to the user to inspect and change the state of the simulated machine.
+;;
 ;; c.
 ;; She should then be able to continue execution by saying
 ;; (proceed-machine ⟨machine⟩)
 ;;
+;; Solution:
+;; We will listen for this and continue execution like normal.
+;;
+;; TODO: cancel the breakpoint is all that is left + refinement
 ;; d.
 ;; She should also be able to remove a specific breakpoint by
 ;; means of
 ;; (cancel-breakpoint ⟨machine⟩ ⟨label⟩ ⟨n⟩)
 ;; or to remove all breakpoints by means of
 ;; (cancel-all-breakpoints ⟨machine⟩)
+;;
+;; Solution:
+;; This will search the instructions for the label at that offset, and set the breakpoint pointer to #f.
+;; This will happen by searching through the contents of the pc, and then updating the specified instruction
+;; to no longer have a break point using #f.
+;;
+;; You will have to proceed many times as the breakpoint is encountered
+;; (proceed-machine fact-machine))
+;;
+;; Once you reach fact-done, print the contents of the val register for the answer.
+;; (get-register-contents fact-machine 'val)
+;; You can also use it along the way to inspect the values during breakpoint evaluation.
+;; You can also set the values of registers during execution with
+;; (set-register-contents! fact-machine 'val 100)
 
 (define (distinct seq)
   (define (iter rest result)
@@ -152,9 +185,16 @@
 	(flag (make-register 'flag))
 	(stack (make-stack))
 	(the-instruction-sequence '())
+	(labels '())
 	(data-path '())
 	(instruction-execution-counter 0)
 	(tracing-enabled? #f))
+
+    (define (add-breakpoint label-name n)
+      (let* ((insts (lookup-label labels label-name))
+	     (correct-inst (list-ref insts (- n 1))))
+	(set-instruction-breakpoint! correct-inst)))
+
     (define (print-instruction-execution-counter)
       (newline)
       (display (list 'instructions-executed '= instruction-execution-counter)))
@@ -182,14 +222,23 @@
 	  (if val
 	    (cadr val)
 	    (allocate-register name)))) ;; return the new register object
+
       (define (execute)
 	(let ((insts (get-contents pc)))
 	  (if (null? insts)
 	    'done
-	    (begin (if tracing-enabled? (trace-instruction (car insts)))
-		   ((instruction-execution-proc (car insts)))
-		   (set! instruction-execution-counter (+ instruction-execution-counter 1))
-		   (execute)))))
+	    (let ((inst (car insts)))
+	      (if (instruction-breakpoint? inst)
+		(println 'delimiter "" "Breakpoint encountered for the instruction below. Use (proceed-machine ⟨machine⟩) when done to continue execution.\n" inst)
+		(rest-execution inst))))))
+
+      (define (rest-execution inst)
+	(println "rest" inst)
+	(if tracing-enabled? (trace-instruction inst))
+	((instruction-execution-proc inst))
+	(set! instruction-execution-counter (+ instruction-execution-counter 1))
+	(execute))
+
       (define (trace-instruction inst)
 	(newline)
 	(if (instruction-label inst)
@@ -247,8 +296,27 @@
 	       (set-contents! pc the-instruction-sequence)
 	       (execute))
 	      ((eq? message 'install-instruction-sequence)
-	       (lambda (seq)
-		 (set! the-instruction-sequence seq)))
+	       (lambda (seq-pair)
+		 (set! the-instruction-sequence (car seq-pair))
+		 (set! labels (cdr seq-pair))
+		 ; (newline)
+		 ; (println "labels" labels)
+		 ; (newline)
+		 ; (println "instrs" the-instruction-sequence)
+		 ; (newline)
+		 ; (set-contents! pc the-instruction-sequence)
+		 ; (println "--PC--" (get-contents pc))
+		 ; (newline)
+		 ; (println "TEST" (cadar labels))
+		 ; (set-instruction-breakpoint! (cadar labels))
+		 ; (println "--PC--" (get-contents pc))
+		 ; (newline)
+		 ; (newline)
+		 ; (println "labels" labels)
+		 ; (newline)
+		 ; (println "instrs" the-instruction-sequence)
+		 ; (newline)
+		 ))
 	      ((eq? message 'allocate-register)
 	       allocate-register)
 	      ((eq? message 'get-register)
@@ -261,6 +329,7 @@
 	      ((eq? message 'install-data-path) (lambda (controller-text) (set! data-path (make-data-path controller-text))))
 	      ((eq? message 'data-path) data-path)
 	      ((eq? message 'register-table) register-table)
+	      ((eq? message 'instruction-sequence) the-instruction-sequence)
 	      ((eq? message 'print-instruction-execution-count) (print-instruction-execution-counter))
 	      ((eq? message 'reset-instruction-execution-counter) (reset-instruction-execution-counter))
 	      ((eq? message 'enable-tracing) (toggle-tracing #t))
@@ -269,6 +338,8 @@
 	      ((eq? message 'disable-tracing-for-all-registers) (toggle-tracing-for-all-registers #f))
 	      ((eq? message 'enable-tracing-for-select-registers) (lambda (registers) (toggle-tracing-for-select-registers registers #t)))
 	      ((eq? message 'disable-tracing-for-select-registers) (lambda (registers) (toggle-tracing-for-select-registers registers #f)))
+	      ((eq? message 'set-breakpoint) (lambda (label n) (add-breakpoint label n)))
+	      ((eq? message 'proceed) (rest-execution (car (get-contents pc))))
 	      (else (error "Unknown request: MACHINE"
 			   message))))
       dispatch)))
@@ -281,6 +352,11 @@
 		 value)
   'done)
 
+(define (set-breakpoint machine label n)
+  ((machine 'set-breakpoint) label n))
+(define (proceed-machine machine)
+  (machine 'proceed))
+
 (define (get-register machine reg-name)
   ((machine 'get-register) reg-name))
 
@@ -289,7 +365,7 @@
     controller-text
     (lambda (insts labels)
       (update-insts! insts labels machine)
-      insts)))
+      (cons insts labels))))
 
 (define (extract-labels text receive)
   (if (null? text)
@@ -324,14 +400,17 @@
 	    labels machine pc flag stack ops)))
       insts)))
 
-(define (make-instruction text) (list text '() #f))
+(define (make-instruction text) (list text '() #f #f))
 (define (instruction-text inst) (car inst))
 (define (instruction-execution-proc inst) (cadr inst))
 (define (instruction-label inst) (caddr inst))
+(define (instruction-breakpoint? inst) (cadddr inst))
 (define (set-instruction-execution-proc! inst proc)
   (set-car! (cdr inst) proc))
 (define (set-instruction-label! inst label)
   (set-car! (cddr inst) label))
+(define (set-instruction-breakpoint! inst)
+  (set-car! (cdddr inst) #t))
 
 (define (make-label-entry label-name insts)
   (cons label-name insts))
@@ -563,18 +642,10 @@
       fact-done
       (perform (op print-instruction-execution-count)))))
 
-(define (fact-loop)
-  (println "Factorial Input n:")
-  (let ((n (read)))
-    (set-register-contents! fact-machine 'n n)
-    (fact-machine 'enable-tracing)
-    ((fact-machine 'enable-tracing-for-select-registers) (list 'n))
-    (start fact-machine)
-    (println "n!:" (get-register-contents fact-machine 'val))
-    ((fact-machine 'stack) 'print-statistics)
-    ((fact-machine 'stack) 'initialize)
-    (newline)
-    (fact-loop)))
-
-(newline)
-(fact-loop)
+(println "Factorial Input n:")
+(let ((n (read)))
+  (set-register-contents! fact-machine 'n n)
+  (fact-machine 'enable-tracing)
+  ((fact-machine 'enable-tracing-for-select-registers) (list 'n))
+  (set-breakpoint fact-machine 'after-fact 1)
+  (start fact-machine))
