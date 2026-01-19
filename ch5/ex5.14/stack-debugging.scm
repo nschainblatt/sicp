@@ -12,6 +12,9 @@
 ;; depth used in computing n! for any n > 1. Note that each
 ;; of these is a linear function of n and is thus determined by
 ;; two constants.
+;; The formula for both the total number of pushes and the max depth is:
+;;
+;; 2 * (n-1)
 ;;
 ;; c.
 ;; In order to get the statistics printed, you will
@@ -110,7 +113,8 @@
     (define (print-statistics)
       (newline)
       (display (list 'total-pushes '= number-pushes
-		     'maximum-depth '= max-depth)))
+		     'maximum-depth '= max-depth
+		     'current-depth '= current-depth)))
     (define (dispatch message)
       (cond ((eq? message 'push) push)
 	    ((eq? message 'pop) (pop))
@@ -488,7 +492,7 @@
 
 
 (define (fact-loop)
-  (println "Factorial Input:")
+  (println "Factorial Input n:")
   (let ((n (read)))
     (set-register-contents! fact-machine 'n n)
     (start fact-machine)
@@ -498,4 +502,5 @@
     (newline)
     (fact-loop)))
 
+(newline)
 (fact-loop)
