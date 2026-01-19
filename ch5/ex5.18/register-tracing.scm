@@ -1,8 +1,8 @@
 ;; Exercise 5.18:
 ;;
 ;; a.
-;; Modify the make-register procedure of Sec-
-;; tion 5.2.1 so that registers can be traced. Registers should
+;; Modify the make-register procedure of Section 5.2.1 so that
+;; registers can be traced. Registers should
 ;; accept messages that turn tracing on and off. When a reg-
 ;; ister is traced, assigning a value to the register should print
 ;; the name of the register, the old contents of the register,
@@ -46,12 +46,18 @@
   (or (eq? x y) (symbol<? x y)))
 
 (define (println . args)
-  (newline)
-  (define (iter rest)
-    (if (null? rest)
-      'done
-      (begin (display (car rest)) (display " ") (iter (cdr rest)))))
-  (iter args))
+  (let* ((has-delimiter? (if (and (not (null? args)) (eq? (car args) 'delimiter))
+			   (if (null? (cdr args))
+			     (error "No delimiter supplied --PRINTLN")
+			     #t)
+			   #f))
+	 (delimiter (if has-delimiter? (cadr args) " ")))
+    (newline)
+    (define (iter rest)
+      (if (null? rest)
+	'done
+	(begin (display (car rest)) (display delimiter) (iter (cdr rest)))))
+    (iter (if has-delimiter? (cddr args) args))))
 
 (define (make-machine ops controller-text)
   (let ((machine (make-new-machine)))
@@ -61,11 +67,17 @@
     machine))
 
 (define (make-register name)
-  (let ((contents '*unassigned*))
+  (let ((contents '*unassigned*)
+	(tracing-enabled? #f))
+    (define (set-register value)
+      (if tracing-enabled?
+	(begin (println 'delimiter "" "Register assignment: " name ". Old value: " contents ". New value: " value)))
+      (set! contents value))
     (define (dispatch message)
       (cond ((eq? message 'get) contents)
-	    ((eq? message 'set)
-	     (lambda (value) (set! contents value)))
+	    ((eq? message 'set) set-register)
+	    ((eq? message 'enable-tracing) (set! tracing-enabled? #t))
+	    ((eq? message 'disable-tracing) (set! tracing-enabled? #f))
 	    (else
 	      (error "Unknown request: REGISTER" message))))
     dispatch))
@@ -190,6 +202,15 @@
 	      (list 'register-save-restore (register-save-restore-filter))
 	      (list 'register-assignment (assign-sources-filter))))
 
+      (define (toggle-tracing value)
+	(for-each (lambda (reg-record)
+		    (let ((register (cadr reg-record)))
+		      (if value
+			(register 'enable-tracing)
+			(register 'disable-tracing))))
+		  register-table)
+	(set! tracing-enabled? value))
+
       (define (dispatch message)
 	(cond ((eq? message 'start)
 	       (set-contents! pc the-instruction-sequence)
@@ -211,8 +232,8 @@
 	      ((eq? message 'register-table) register-table)
 	      ((eq? message 'print-instruction-execution-count) (print-instruction-execution-counter))
 	      ((eq? message 'reset-instruction-execution-counter) (reset-instruction-execution-counter))
-	      ((eq? message 'enable-tracing) (set! tracing-enabled? #t))
-	      ((eq? message 'disable-tracing) (set! tracing-enabled? #f))
+	      ((eq? message 'enable-tracing) (toggle-tracing #t))
+	      ((eq? message 'disable-tracing) (toggle-tracing #f))
 	      (else (error "Unknown request: MACHINE"
 			   message))))
       dispatch)))
@@ -506,7 +527,6 @@
       (goto (reg continue))
       fact-done
       (perform (op print-instruction-execution-count)))))
-
 
 (define (fact-loop)
   (println "Factorial Input n:")
