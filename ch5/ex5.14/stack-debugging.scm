@@ -445,52 +445,35 @@
      (goto (reg continue))
      ))
 
-(define fib-machine
+(define fact-machine
   (make-machine
-    (list (list '- -) (list '+ +) (list '< <))
-    '((assign continue (label fib-done))
-      fib-loop
-      (test (op <) (reg n) (const 2))
-      (branch (label immediate-answer))
-      ;; set up to compute Fib(n  1)
+    (list (list '= =) (list '- -) (list '* *))
+    '((assign continue (label fact-done))
+      fact-loop
+      (test (op =) (reg n) (const 1))
+      (branch (label base-case))
       (save continue)
-      (assign continue (label afterfib-n-1))
-      (save n) ; save old value of n
-      (assign n (op -) (reg n) (const 1)) ; clobber n to n-1
-      (goto (label fib-loop)) ; perform recursive call
-      afterfib-n-1 ; upon return, val contains Fib(n  1)
+      (save n)
+      (assign n (op -) (reg n) (const 1))
+      (assign continue (label after-fact))
+      (goto (label fact-loop))
+      after-fact
       (restore n)
       (restore continue)
-      ;; set up to compute Fib(n  2)
-      (assign n (op -) (reg n) (const 2))
-      (save continue)
-      (assign continue (label afterfib-n-2))
-      (save val) ; save Fib(n  1)
-      (goto (label fib-loop))
-      afterfib-n-2 ; upon return, val contains Fib(n  2)
-      (assign n (reg val)) ; n now contains Fib(n  2)
-      (restore val) ; val now contains Fib(n  1)
-      (restore continue)
-      (assign val ; Fib(n  1) + Fib(n  2)
-	      (op +) (reg val) (reg n))
-      (goto (reg continue)) ; return to caller, answer is in
-      val
-      immediate-answer
-      (assign val (reg n)) ; base case: Fib(n) = n
+      (assign val (op *) (reg n) (reg val))
       (goto (reg continue))
-      fib-done)))
+      base-case
+      (assign val (const 1))
+      (goto (reg continue))
+      fact-done)))
 
-;; Notice that the registers are allocated during assembly time, which is why the register table
-;; pre and post contain the same registers.
-(newline)
-(println "Pre - Allocated Registers:" (fib-machine 'register-table))
-(newline)
-(for-each (lambda (path) (println (car path)) (println (cadr path)) (newline)) (fib-machine 'data-path))
-(newline)
-(define n 7)
-(println "Fib of" n)
-(set-register-contents! fib-machine 'n n)
-(start fib-machine)
-(println (get-register-contents fib-machine 'val))
-(newline)
-(println "Post - Allocated Registers:" (fib-machine 'register-table))
+
+(define (fact-loop)
+  (println "Factorial input:")
+  (let ((n (read)))
+    (set-register-contents! fact-machine 'n n)
+    (start fact-machine)
+    (println "n!:" (get-register-contents fact-machine 'val))
+    (fact-loop)))
+
+(fact-loop)
