@@ -5,6 +5,14 @@
 ;; Instead of pre-allocating the registers in
 ;; make-machine, you can allocate them one at a time when
 ;; they are first seen during assembly of the instructions
+;;
+;; Solution:
+;; Inside the assembler, when we encounter a register, check the table during assembly time
+;; if we already have this register allocated. If we don't we will allocate it and then use it.
+;; The different expression types that utilize registers all obtain the register to use by using
+;; 'get-register', which is a helper that looks up the register in the machine using message passing.
+;; We just have to update the internal procedure in the machine named 'lookup-register' to create a register
+;; if one isn't found, otherwise, returns the existing register.
 
 (define (distinct seq)
   (define (iter rest result)
@@ -46,12 +54,8 @@
       (begin (display (car rest)) (display " ") (iter (cdr rest)))))
   (iter args))
 
-(define (make-machine register-names ops controller-text)
+(define (make-machine ops controller-text)
   (let ((machine (make-new-machine)))
-    (for-each
-      (lambda (register-name)
-	((machine 'allocate-register) register-name))
-      register-names)
     ((machine 'install-operations) ops)
     ((machine 'install-data-path) controller-text)
     ((machine 'install-instruction-sequence) (assemble controller-text machine))
@@ -107,15 +111,14 @@
       (define (allocate-register name)
 	(if (assoc name register-table)
 	  (error "Multiply defined register: " name)
-	  (set! register-table
-	    (cons (list name (make-register name))
-		  register-table)))
-	'register-allocated)
+	  (let ((new-reg (make-register name)))
+	    (set! register-table (cons (list name new-reg) register-table))
+	    new-reg)))
       (define (lookup-register name)
 	(let ((val (assoc name register-table)))
 	  (if val
 	    (cadr val)
-	    (error "Unknown register:" name))))
+	    (allocate-register name)))) ;; return the new register object
       (define (execute)
 	(let ((insts (get-contents pc)))
 	  (if (null? insts)
@@ -168,6 +171,7 @@
 	      ((eq? message 'operations) the-ops)
 	      ((eq? message 'install-data-path) (lambda (controller-text) (set! data-path (make-data-path controller-text))))
 	      ((eq? message 'data-path) data-path)
+	      ((eq? message 'register-table) register-table)
 	      (else (error "Unknown request: MACHINE"
 			   message))))
       dispatch)))
@@ -434,7 +438,6 @@
 
 (define fib-machine
   (make-machine
-    '(n continue val)
     (list (list '- -) (list '+ +) (list '< <))
     '((assign continue (label fib-done))
       fib-loop
@@ -468,5 +471,17 @@
       (goto (reg continue))
       fib-done)))
 
+;; Notice that the registers are allocated during assembly time, which is why the register table
+;; pre and post contain the same registers.
+(newline)
+(println "Pre - Allocated Registers:" (fib-machine 'register-table))
 (newline)
 (for-each (lambda (path) (println (car path)) (println (cadr path)) (newline)) (fib-machine 'data-path))
+(newline)
+(define n 7)
+(println "Fib of" n)
+(set-register-contents! fib-machine 'n n)
+(start fib-machine)
+(println (get-register-contents fib-machine 'val))
+(newline)
+(println "Post - Allocated Registers:" (fib-machine 'register-table))
