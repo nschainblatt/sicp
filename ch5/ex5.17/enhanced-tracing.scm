@@ -11,6 +11,12 @@
 ;; sary label information.
 ;;
 ;; Solution:
+;; Update the internal representation of assembled instructions to hold the label they belong too
+;; if they are the first instruction after a label.
+;; This works by updated extract-labels to use the reference to the insts after a label
+;; to grab the first one if there are actually instructions after that label and it's not just the end of the controller.
+;; We then update that specific instructions label pointer to the correct label name.
+;; Then, in the tracing section we print the value of the instructions label if it is set.
 
 (define (distinct seq)
   (define (iter rest result)
@@ -152,13 +158,17 @@
 	(let ((insts (get-contents pc)))
 	  (if (null? insts)
 	    'done
-	    (begin
-	      (if tracing-enabled?
-		(begin (newline) (display "Trace: ")  (display (instruction-text (car insts)))))
-	      ((instruction-execution-proc (car insts)))
-	      (set! instruction-execution-counter (+ instruction-execution-counter 1))
-	      (execute)))))
-
+	    (begin (if tracing-enabled? (trace-instruction (car insts)))
+		   ((instruction-execution-proc (car insts)))
+		   (set! instruction-execution-counter (+ instruction-execution-counter 1))
+		   (execute)))))
+      (define (trace-instruction inst)
+	(newline)
+	(if (instruction-label inst)
+	  (begin (display "Label: ")
+		 (display (instruction-label inst))
+		 (newline)))
+	(display "Trace: ") (display (instruction-text inst)))
       (define (make-data-path instructions)
 	(define (all-instructions-filter)
 	  (my-sort (distinct (filter (lambda (instr) (pair? instr)) instructions)) car))
@@ -238,10 +248,13 @@
       (lambda (insts labels)
 	(let ((next-inst (car text)))
 	  (if (symbol? next-inst)
-	    (receive insts
-		     (cons (make-label-entry next-inst
-					     insts)
-			   labels))
+	    (begin
+	      (if (not (null? insts))
+		(set-instruction-label! (car insts) next-inst))
+	      (receive insts
+		       (cons (make-label-entry next-inst
+					       insts)
+			     labels)))
 	    (receive (cons (make-instruction next-inst)
 			   insts)
 		     labels)))))))
@@ -260,11 +273,14 @@
 	    labels machine pc flag stack ops)))
       insts)))
 
-(define (make-instruction text) (cons text '()))
+(define (make-instruction text) (list text '() #f))
 (define (instruction-text inst) (car inst))
-(define (instruction-execution-proc inst) (cdr inst))
+(define (instruction-execution-proc inst) (cadr inst))
+(define (instruction-label inst) (caddr inst))
 (define (set-instruction-execution-proc! inst proc)
-  (set-cdr! inst proc))
+  (set-car! (cdr inst) proc))
+(define (set-instruction-label! inst label)
+  (set-car! (cddr inst) label))
 
 (define (make-label-entry label-name insts)
   (cons label-name insts))
