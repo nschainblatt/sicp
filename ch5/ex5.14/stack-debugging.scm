@@ -488,11 +488,14 @@
 
 
 (define (fact-loop)
-  (println "Factorial input:")
+  (println "Factorial Input:")
   (let ((n (read)))
     (set-register-contents! fact-machine 'n n)
     (start fact-machine)
     (println "n!:" (get-register-contents fact-machine 'val))
+    ((fact-machine 'stack) 'print-statistics)
+    ((fact-machine 'stack) 'initialize)
+    (newline)
     (fact-loop)))
 
 (fact-loop)
