@@ -28,16 +28,6 @@
 ;; 6. Add our procedures to the message passing interface of the machine.
 ;; 7. Test the new message type with the fibonacci machine and paste the output here.
 
-(define (register-label-filter instructions)
-  (distinct (map (lambda (instr) (register-exp-reg (goto-dest instr)))
-		 (filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'goto) (register-exp? (goto-dest instr))))
-			 instructions))))
-
-(define (register-save-restore-filter instructions)
-  (distinct (map (lambda (instr) (stack-inst-reg-name instr))
-		 (filter (lambda (instr) (and (pair? instr) (or (eq? (car instr) 'save) (eq? (car instr) 'restore))))
-			 instructions))))
-
 (define (distinct seq)
   (define (iter rest result)
     (cond ((null? rest) result)
@@ -85,8 +75,8 @@
 	((machine 'allocate-register) register-name))
       register-names)
     ((machine 'install-operations) ops)
-    ((machine 'install-instruction-sequence)
-     (assemble controller-text machine))
+    ((machine 'install-controller-text) controller-text)
+    ((machine 'install-instruction-sequence) (assemble controller-text machine))
     machine))
 
 (define (make-register name)
@@ -129,7 +119,8 @@
   (let ((pc (make-register 'pc))
 	(flag (make-register 'flag))
 	(stack (make-stack))
-	(the-instruction-sequence '()))
+	(the-instruction-sequence '())
+	(controller-text '()))
     (let ((the-ops
 	    (list (list 'initialize-stack
 			(lambda () (stack 'initialize)))))
@@ -154,6 +145,33 @@
 	    (begin
 	      ((instruction-execution-proc (car insts)))
 	      (execute)))))
+
+      (define (make-data-path)
+	(define (all-instructions-filter instructions)
+	  (my-sort (distinct (filter (lambda (instr) (pair? instr)) instructions)) car))
+	(define (register-label-filter instructions)
+	  (distinct (map (lambda (instr) (register-exp-reg (goto-dest instr)))
+			 (filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'goto) (register-exp? (goto-dest instr))))
+				 instructions))))
+	(define (register-save-restore-filter instructions)
+	  (distinct (map (lambda (instr) (stack-inst-reg-name instr))
+			 (filter (lambda (instr) (and (pair? instr) (or (eq? (car instr) 'save) (eq? (car instr) 'restore))))
+				 instructions))))
+
+	(define (assign-sources-filter instructions)
+	  (define (iter registers result)
+	    (if (null? registers)
+	      result
+	      (let ((reg-record (car registers)))
+		(iter (cdr registers) (cons (cons (car reg-record) (map (lambda (instr) (assign-value-exp instr))
+						(filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'assign) (eq? (car reg-record) (assign-reg-name instr))))
+							instructions))) result)))))
+	  (iter register-table '()))
+	(list (list 'all-instructions (all-instructions-filter controller-text))
+	      (list 'goto-registers (register-label-filter controller-text))
+	      (list 'register-save-restore (register-save-restore-filter controller-text))
+	      (list 'register-assignment (assign-sources-filter controller-text))))
+	
       (define (dispatch message)
 	(cond ((eq? message 'start)
 	       (set-contents! pc the-instruction-sequence)
@@ -170,6 +188,8 @@
 		 (set! the-ops (append the-ops ops))))
 	      ((eq? message 'stack) stack)
 	      ((eq? message 'operations) the-ops)
+	      ((eq? message 'install-controller-text) (lambda (text) (set! controller-text text)))
+	      ((eq? message 'data-path) (make-data-path))
 	      (else (error "Unknown request: MACHINE"
 			   message))))
       dispatch)))
@@ -434,8 +454,38 @@
      (goto (reg continue))
      ))
 
-(println (register-label-filter test))
-(println (register-save-restore-filter test))
-
-;; ---
-
+(define fib-machine
+  (make-machine
+    '(n continue val)
+    (list (list '- -) (list '+ +) (list '< <))
+    '((assign continue (label fib-done))
+      fib-loop
+      (test (op <) (reg n) (const 2))
+      (branch (label immediate-answer))
+      ;; set up to compute Fib(n  1)
+      (save continue)
+      (assign continue (label afterfib-n-1))
+      (save n) ; save old value of n
+      (assign n (op -) (reg n) (const 1)) ; clobber n to n-1
+      (goto (label fib-loop)) ; perform recursive call
+      afterfib-n-1 ; upon return, val contains Fib(n  1)
+      (restore n)
+      (restore continue)
+      ;; set up to compute Fib(n  2)
+      (assign n (op -) (reg n) (const 2))
+      (save continue)
+      (assign continue (label afterfib-n-2))
+      (save val) ; save Fib(n  1)
+      (goto (label fib-loop))
+      afterfib-n-2 ; upon return, val contains Fib(n  2)
+      (assign n (reg val)) ; n now contains Fib(n  2)
+      (restore val) ; val now contains Fib(n  1)
+      (restore continue)
+      (assign val ; Fib(n  1) + Fib(n  2)
+	      (op +) (reg val) (reg n))
+      (goto (reg continue)) ; return to caller, answer is in
+      val
+      immediate-answer
+      (assign val (reg n)) ; base case: Fib(n) = n
+      (goto (reg continue))
+      fib-done)))
