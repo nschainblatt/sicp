@@ -203,13 +203,23 @@
 	      (list 'register-assignment (assign-sources-filter))))
 
       (define (toggle-tracing value)
+	(set! tracing-enabled? value))
+
+      (define (toggle-tracing-for-all-registers value)
 	(for-each (lambda (reg-record)
 		    (let ((register (cadr reg-record)))
 		      (if value
 			(register 'enable-tracing)
 			(register 'disable-tracing))))
-		  register-table)
-	(set! tracing-enabled? value))
+		  register-table))
+
+      (define (toggle-tracing-for-select-registers registers value)
+	(for-each (lambda (name)
+		    (let ((register (lookup-register name)))
+		      (if value
+			(register 'enable-tracing)
+			(register 'disable-tracing))))
+		  registers))
 
       (define (dispatch message)
 	(cond ((eq? message 'start)
@@ -234,6 +244,10 @@
 	      ((eq? message 'reset-instruction-execution-counter) (reset-instruction-execution-counter))
 	      ((eq? message 'enable-tracing) (toggle-tracing #t))
 	      ((eq? message 'disable-tracing) (toggle-tracing #f))
+	      ((eq? message 'enable-tracing-for-all-registers) (toggle-tracing-for-all-registers #t))
+	      ((eq? message 'disable-tracing-for-all-registers) (toggle-tracing-for-all-registers #f))
+	      ((eq? message 'enable-tracing-for-select-registers) (lambda (registers) (toggle-tracing-for-select-registers registers #t)))
+	      ((eq? message 'disable-tracing-for-select-registers) (lambda (registers) (toggle-tracing-for-select-registers registers #f)))
 	      (else (error "Unknown request: MACHINE"
 			   message))))
       dispatch)))
@@ -533,6 +547,7 @@
   (let ((n (read)))
     (set-register-contents! fact-machine 'n n)
     (fact-machine 'enable-tracing)
+    ((fact-machine 'enable-tracing-for-select-registers) (list 'n))
     (start fact-machine)
     (println "n!:" (get-register-contents fact-machine 'val))
     ((fact-machine 'stack) 'print-statistics)
