@@ -23,11 +23,6 @@
 ;; define the Fibonacci machine from Figure 5.12 and examine
 ;; the lists you constructed.
 
-;; Steps:
-;; 5. Get a list of all the sources that are used to write to a register (do for all registers), note that an entire op can be a source.
-;; 6. Add our procedures to the message passing interface of the machine.
-;; 7. Test the new message type with the fibonacci machine and paste the output here.
-
 (define (distinct seq)
   (define (iter rest result)
     (cond ((null? rest) result)
@@ -75,7 +70,7 @@
 	((machine 'allocate-register) register-name))
       register-names)
     ((machine 'install-operations) ops)
-    ((machine 'install-controller-text) controller-text)
+    ((machine 'install-data-path) controller-text)
     ((machine 'install-instruction-sequence) (assemble controller-text machine))
     machine))
 
@@ -120,7 +115,7 @@
 	(flag (make-register 'flag))
 	(stack (make-stack))
 	(the-instruction-sequence '())
-	(controller-text '()))
+	(data-path '()))
     (let ((the-ops
 	    (list (list 'initialize-stack
 			(lambda () (stack 'initialize)))))
@@ -146,7 +141,7 @@
 	      ((instruction-execution-proc (car insts)))
 	      (execute)))))
 
-      (define (make-data-path)
+      (define (make-data-path instructions)
 	(define (all-instructions-filter instructions)
 	  (my-sort (distinct (filter (lambda (instr) (pair? instr)) instructions)) car))
 	(define (register-label-filter instructions)
@@ -164,14 +159,14 @@
 	      result
 	      (let ((reg-record (car registers)))
 		(iter (cdr registers) (cons (cons (car reg-record) (map (lambda (instr) (assign-value-exp instr))
-						(filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'assign) (eq? (car reg-record) (assign-reg-name instr))))
-							instructions))) result)))))
+									(filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'assign) (eq? (car reg-record) (assign-reg-name instr))))
+										instructions))) result)))))
 	  (iter register-table '()))
-	(list (list 'all-instructions (all-instructions-filter controller-text))
-	      (list 'goto-registers (register-label-filter controller-text))
-	      (list 'register-save-restore (register-save-restore-filter controller-text))
-	      (list 'register-assignment (assign-sources-filter controller-text))))
-	
+	(list (list 'all-instructions (all-instructions-filter instructions))
+	      (list 'goto-registers (register-label-filter instructions))
+	      (list 'register-save-restore (register-save-restore-filter instructions))
+	      (list 'register-assignment (assign-sources-filter instructions))))
+
       (define (dispatch message)
 	(cond ((eq? message 'start)
 	       (set-contents! pc the-instruction-sequence)
@@ -188,8 +183,8 @@
 		 (set! the-ops (append the-ops ops))))
 	      ((eq? message 'stack) stack)
 	      ((eq? message 'operations) the-ops)
-	      ((eq? message 'install-controller-text) (lambda (text) (set! controller-text text)))
-	      ((eq? message 'data-path) (make-data-path))
+	      ((eq? message 'install-data-path) (lambda (controller-text) (set! data-path (make-data-path controller-text))))
+	      ((eq? message 'data-path) data-path)
 	      (else (error "Unknown request: MACHINE"
 			   message))))
       dispatch)))
@@ -489,3 +484,6 @@
       (assign val (reg n)) ; base case: Fib(n) = n
       (goto (reg continue))
       fib-done)))
+
+(newline)
+(for-each (lambda (path) (println (car path)) (println (cadr path)) (newline)) (fib-machine 'data-path))
