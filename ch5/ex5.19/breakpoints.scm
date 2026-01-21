@@ -25,6 +25,7 @@
 ;; stored in the instruction sequence, so updating one will update the other.
 ;; We also will not have  to reload the pc register since it also shares the same reference, in other
 ;; words, the machine will not have to be restarted to get a breakpoint after the machine has already started.
+;; We can add and remove breakpoints dynamically throughout execution.
 ;;
 ;; b.
 ;; When the simulator reaches the breakpoint it should
@@ -43,9 +44,11 @@
 ;; (proceed-machine ⟨machine⟩)
 ;;
 ;; Solution:
-;; We will listen for this and continue execution like normal.
+;; When we paused execution we give control back to the repl, which will allow the user to enter and use any defined procedures.
+;; They can call a procedure we implement to give control back to the machine, and continue executing instructions.
+;; I have separated out the parts of the execute procedure that happen before and after encountering a breakpoint, this way, our proceed
+;; logic can reuse that last part of the execute process.
 ;;
-;; TODO: cancel the breakpoint is all that is left + refinement
 ;; d.
 ;; She should also be able to remove a specific breakpoint by
 ;; means of
@@ -55,17 +58,8 @@
 ;;
 ;; Solution:
 ;; This will search the instructions for the label at that offset, and set the breakpoint pointer to #f.
-;; This will happen by searching through the contents of the pc, and then updating the specified instruction
-;; to no longer have a break point using #f.
-;;
-;; You will have to proceed many times as the breakpoint is encountered
-;; (proceed-machine fact-machine))
-;;
-;; Once you reach fact-done, print the contents of the val register for the answer.
-;; (get-register-contents fact-machine 'val)
-;; You can also use it along the way to inspect the values during breakpoint evaluation.
-;; You can also set the values of registers during execution with
-;; (set-register-contents! fact-machine 'val 100)
+;; This uses the same logic as adding a breakpoint, just a false boolean value instead.
+;; To cancel all, we iterate through all instructions in the sequence and set their breakpoint values to false.
 
 (define (distinct seq)
   (define (iter rest result)
@@ -190,10 +184,18 @@
 	(instruction-execution-counter 0)
 	(tracing-enabled? #f))
 
-    (define (add-breakpoint label-name n)
+    (define (toggle-breakpoint label-name n val)
       (let* ((insts (lookup-label labels label-name))
 	     (correct-inst (list-ref insts (- n 1))))
-	(set-instruction-breakpoint! correct-inst)))
+	(set-instruction-breakpoint! correct-inst val)))
+
+    (define (cancel-all-breakpoints)
+      (define (iter rest)
+	(if (null? rest)
+	  'done
+	  (begin (set-instruction-breakpoint! (car rest) #f)
+		 (iter (cdr rest)))))
+      (iter the-instruction-sequence))
 
     (define (print-instruction-execution-counter)
       (newline)
@@ -298,25 +300,7 @@
 	      ((eq? message 'install-instruction-sequence)
 	       (lambda (seq-pair)
 		 (set! the-instruction-sequence (car seq-pair))
-		 (set! labels (cdr seq-pair))
-		 ; (newline)
-		 ; (println "labels" labels)
-		 ; (newline)
-		 ; (println "instrs" the-instruction-sequence)
-		 ; (newline)
-		 ; (set-contents! pc the-instruction-sequence)
-		 ; (println "--PC--" (get-contents pc))
-		 ; (newline)
-		 ; (println "TEST" (cadar labels))
-		 ; (set-instruction-breakpoint! (cadar labels))
-		 ; (println "--PC--" (get-contents pc))
-		 ; (newline)
-		 ; (newline)
-		 ; (println "labels" labels)
-		 ; (newline)
-		 ; (println "instrs" the-instruction-sequence)
-		 ; (newline)
-		 ))
+		 (set! labels (cdr seq-pair))))
 	      ((eq? message 'allocate-register)
 	       allocate-register)
 	      ((eq? message 'get-register)
@@ -338,7 +322,9 @@
 	      ((eq? message 'disable-tracing-for-all-registers) (toggle-tracing-for-all-registers #f))
 	      ((eq? message 'enable-tracing-for-select-registers) (lambda (registers) (toggle-tracing-for-select-registers registers #t)))
 	      ((eq? message 'disable-tracing-for-select-registers) (lambda (registers) (toggle-tracing-for-select-registers registers #f)))
-	      ((eq? message 'set-breakpoint) (lambda (label n) (add-breakpoint label n)))
+	      ((eq? message 'set-breakpoint) (lambda (label n) (toggle-breakpoint label n #t)))
+	      ((eq? message 'cancel-breakpoint) (lambda (label n) (toggle-breakpoint label n #f)))
+	      ((eq? message 'cancel-all-breakpoints) (cancel-all-breakpoints))
 	      ((eq? message 'proceed) (rest-execution (car (get-contents pc))))
 	      (else (error "Unknown request: MACHINE"
 			   message))))
@@ -354,6 +340,10 @@
 
 (define (set-breakpoint machine label n)
   ((machine 'set-breakpoint) label n))
+(define (cancel-breakpoint machine label n)
+  ((machine 'cancel-breakpoint) label n))
+(define (cancel-all-breakpoints machine)
+  (machine 'cancel-all-breakpoints))
 (define (proceed-machine machine)
   (machine 'proceed))
 
@@ -409,8 +399,8 @@
   (set-car! (cdr inst) proc))
 (define (set-instruction-label! inst label)
   (set-car! (cddr inst) label))
-(define (set-instruction-breakpoint! inst)
-  (set-car! (cdddr inst) #t))
+(define (set-instruction-breakpoint! inst value)
+  (set-car! (cdddr inst) value))
 
 (define (make-label-entry label-name insts)
   (cons label-name insts))
