@@ -190,12 +190,7 @@
 	(set-instruction-breakpoint! correct-inst val)))
 
     (define (cancel-all-breakpoints)
-      (define (iter rest)
-	(if (null? rest)
-	  'done
-	  (begin (set-instruction-breakpoint! (car rest) #f)
-		 (iter (cdr rest)))))
-      (iter the-instruction-sequence))
+      (for-each (lambda (inst) (set-instruction-breakpoint! inst #f)) the-instruction-sequence))
 
     (define (print-instruction-execution-counter)
       (newline)
