@@ -230,7 +230,6 @@
 		(rest-execution inst))))))
 
       (define (rest-execution inst)
-	(println "rest" inst)
 	(if tracing-enabled? (trace-instruction inst))
 	((instruction-execution-proc inst))
 	(set! instruction-execution-counter (+ instruction-execution-counter 1))
