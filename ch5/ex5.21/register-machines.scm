@@ -45,34 +45,34 @@
 				    n)))))
   (count-iter tree 0))
 
-;; ((1 2) (3 4)) => 4
-
 (define count-leaves-machine-2
   (make-machine
     (list (list '+ +))
     '(
-      (assign (reg n) (const 0))
-      (assign (reg continue) (label count-done))
-      (save continue)
-      (assign coninue (label count-leaves))
+	(assign n (const 0))
+	(assign continue (label count-done))
+	(save tree)
+	(save continue)
+	(assign continue (label count-leaves))
+	
       count-leaves
 	(test (op null?) (reg tree))
-	(restore tree) ;; FIXME: at the end, due to our uneven saves, we don't have a tree to restore.
 	(restore continue)
+	(restore tree)
 	(branch (reg continue))
 
 	(test (op pair?) (reg tree))
 	(assign temp (op car) (reg tree))
 	(assign tree (op cdr) (reg tree))
-	(save continue)
 	(save tree)
+	(save continue)
 	(assign continue (label count-leaves))
 	(assign tree (reg temp))
 	(branch count-leaves)
 
 	(assign n (op +) (reg n) (const 1))
-	(restore tree)
 	(restore continue)
+	(restore tree)
 	(goto (reg continue))
 
       count-done
