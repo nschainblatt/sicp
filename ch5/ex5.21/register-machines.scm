@@ -19,17 +19,33 @@
   (make-machine
     (list (list '+ +))
     '(
-
-      count-leaves
+	(assign n (const 0))
+	(assign continue (label count-done))
+	
+      count-leaves-car
 	(test (op null?) (reg tree))
+	(restore continue)
+	(restore tree)
+	(branch (reg continue))
 
+	(test (op pair?) (reg tree))
+	(save tree)
+	(assign tree (op car) (reg tree))
+	(save continue)
+	(assign continue (label count-leaves-cdr))
+	(branch count-leaves-car)
 
+	(assign n (op +) (reg n) (const 1))
+	(restore continue)
+	(restore tree)
+	(goto (reg continue))
 
+      count-leaves-cdr
+	(assign tree (op cdr) (reg tree))
+	(goto (label count-leaves-car))
 
-
-
-
-
+      count-done
+      ;; Get register contents of n to see results.
       )))
 
 
