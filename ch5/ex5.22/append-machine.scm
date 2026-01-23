@@ -36,12 +36,30 @@
       ;; answer is in register val
       )))
 
-
-
-
-
 (define (append! x y)
   (set-cdr! (last-pair x) y)
   x)
 (define (last-pair x)
   (if (null? (cdr x)) x (last-pair (cdr x))))
+
+(define append-machine!
+  (make-machine
+    (list (list 'set-cdr! set-cdr!) (list 'cdr cdr) (list 'null? null?))
+    '(
+        (assign tmp-x (reg x))
+        (assign continue (label append-done))
+      last-pair-loop
+        (assign tmp (op cdr) (reg x))
+        (test (op null?) (reg tmp))
+        (branch (label base-case))
+        (save x)
+        (save continue)
+        (assign x (op cdr) (reg x))
+        (goto (label last-pair-loop))
+      base-case
+        (perform (op set-cdr!) (reg x) (reg y))
+        (assign x (reg tmp-x))
+        (goto (label append-done))
+      append-done
+      ;; answer is in register x
+      )))
