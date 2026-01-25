@@ -87,9 +87,10 @@ ev-clause-did-predicate
   (goto (label ev-cond-loop))                                     ;; Otherwise, try the next clause
 
 ev-cond-clause-actions
-  (assign exp (op cond-actions) (reg exp))                        ;; Get the cond actions from the current clause
-  (restore continue)                                              ;; Get the original location to return to with val after eval-dispatch.
-  (goto (label eval-dispatch))                                    ;; Evaluate the actions, and return to caller with the actions value in register val
+  (assign exp (op cond-actions) (reg exp))                        ;; Get the cond actions sequence from the current clause
+  ;; NOTE: We don't restore continue here since we call ev-sequence directly, just like with compound-apply, ev-sequence assumes continue is already saved on the stack.
+  ;;       This is also a terminal label, where we return to the original continue after, which is why we don't save any registers.
+  (goto (label ev-sequence))                                      ;; Evaluate the actions, and return to caller with the actions value in register val
 
 handle-ev-cond-else
   (test (op null?) (reg unev))                                    ;; Unev already has rest of clauses, should be null if we encountered an else
