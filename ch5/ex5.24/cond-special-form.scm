@@ -59,6 +59,7 @@
 ;; env: the environment to evaluate the pieces of the cond expression in, unless there are procedure applications which are handled in their own extended environment.
 
 ev-cond
+  (save continue)                                                 ;; Save continue a single time, this is for the location to return to with the value of the entire cond expression in register val.
   (assign unev (op cond-clauses) (reg exp))
 
 ev-cond-loop
@@ -72,7 +73,6 @@ ev-cond-loop
 ev-clause-predicate
   (save env)                                                      ;; Save the environment the cond expression was defined in to be used for subsequent sub-expression evaluations in the cond.
   (save unev)                                                     ;; Save the clauses as eval-dispatch may overwrite the contents of the unev register.
-  (save continue)                                                 ;; Save the location to return to with the value of the cond expression in register val (result of actions or false if no else)
   (save exp)                                                      ;; Save the first clause to handle later in ev-clause-did-predicate
   (assign exp (op cond-predicate) (reg exp))                      ;; Get the predicate to evaluate
   (assign continue (label ev-clause-did-predicate))               ;; Assign continue to where to go to handle the result of the predicates evaluation
@@ -80,7 +80,6 @@ ev-clause-predicate
 
 ev-clause-did-predicate
   (restore exp)                                                   ;; Get the first clause back
-  (restore continue)                                              ;; Get the location to return to if the predicate was true, or there are no more clauses to try
   (restore unev)                                                  ;; Get the remaining clauses to try
   (restore env)                                                   ;; Get the environment to evaluate the rest of the sub-expressions.
   (test (op true?) (reg val))                                     ;; Check the predicate
@@ -89,8 +88,7 @@ ev-clause-did-predicate
 
 ev-cond-clause-actions
   (assign exp (op cond-actions) (reg exp))                        ;; Get the cond actions from the current clause
-  ;; No need to save any registers here as we are exiting this area, we will have the value of the cond in the val register, and eval-dispatch will use our current location in continue (the origial) to know where to return
-  ;; to in order to use the new value.
+  (restore continue)                                              ;; Get the original location to return to with val after eval-dispatch.
   (goto (label eval-dispatch))                                    ;; Evaluate the actions, and return to caller with the actions value in register val
 
 handle-ev-cond-else
@@ -102,5 +100,5 @@ handle-ev-cond-else
 
 no-else
   (assign val (const #f))                                         ;; Only location in ev-cond that assigns to val, eval-dispatch handles the results of clause actions.
-  ;; No need to restore continue as it was restored in the previous loop (ev-clause-did-predicate), or if it was an empty cond expression the continue register still has the original location to return to.
+  (restore continue)                                              ;; Get the original location to return to with val.
   (goto (reg continue))                                           ;; Go back to the expression that needs the value of the cond.
