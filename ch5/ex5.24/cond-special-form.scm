@@ -60,7 +60,6 @@
 
 ev-cond
   (assign unev (op cond-clauses) (reg exp))
-  (goto (label ev-cond-loop))
 
 ev-cond-loop
   (test (op null?) (reg unev))
@@ -69,7 +68,6 @@ ev-cond-loop
   (assign unev (op rest-clauses) (reg unev))                      ;; Get the rest of the clauses to try later if current predicate isn't true
   (test (op cond-else-clause?) (reg exp))
   (branch (label handle-ev-cond-else))
-  (goto (label ev-clause-predicate))
 
 ev-clause-predicate
   (save env)                                                      ;; Save the environment the cond expression was defined in to be used for subsequent sub-expression evaluations in the cond.
@@ -97,13 +95,10 @@ ev-cond-clause-actions
 
 handle-ev-cond-else
   (test (op null?) (reg unev))                                    ;; Unev already has rest of clauses, should be null if we encountered an else
-  (branch (label ev-cond-else))
+  (branch (label ev-cond-clause-actions))
   (perform (op error) (const "ELSE clause isn't last: COND->IF")  ;; Throw appropriate error with context of else clause and rest of clauses, this is a terminal operation, hence no jump after.
 	              (reg exp)
 		      (reg unev))
-
-ev-cond-else
-  (goto ev-cond-clause-actions)                                   ;; Evaluate the else clauses actions
 
 no-else
   (assign val (const #f))                                         ;; Only location in ev-cond that assigns to val, eval-dispatch handles the results of clause actions.
