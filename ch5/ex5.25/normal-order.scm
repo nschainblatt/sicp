@@ -131,7 +131,6 @@ ev-sequence-last-exp
 
 ev-if
   (save exp) ; save expression for later (consequent, alternative evaluation)
-  (assign continue (label ev-if-decide))
   (assign exp (op if-predicate) (reg exp))
   (assign val (op actual-value) (reg exp)) ;; Get actual value of predicate
 
