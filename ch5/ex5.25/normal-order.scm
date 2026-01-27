@@ -55,64 +55,41 @@ ev-lambda
   (goto (reg continue))
 
 ev-application
-  (save continue)
-  (save env)
   (assign unev (op operands) (reg exp))
-  (save unev)
   (assign exp (op operator) (reg exp))
-  (assign continue (label ev-appl-did-operator))
-  (goto (label eval-dispatch))
-
-ev-appl-did-operator
-  (restore unev) ; the operands
-  (restore env)
-  (assign argl (op empty-arglist))
-  (assign proc (reg val)) ; the operator
-  (test (op no-operands?) (reg unev))
-  (branch (label apply-dispatch))
-  (save proc)
-
-ev-appl-operand-loop
-  (save argl)
-  (assign exp (op first-operand) (reg unev))
-  (test (op last-operand?) (reg unev))
-  (branch (label ev-appl-last-arg))
-  (save env)
-  (save unev)
-  (assign continue (label ev-appl-accumulate-arg))
-  (goto (label eval-dispatch))
-
-ev-appl-accumulate-arg
-  (restore unev)
-  (restore env)
-  (restore argl)
-  (assign argl (op adjoin-arg) (reg val) (reg argl))
-  (assign unev (op rest-operands) (reg unev))
-  (goto (label ev-appl-operand-loop))
-
-ev-appl-last-arg
-  (assign continue (label ev-appl-accum-last-arg))
-  (goto (label eval-dispatch))
-
-ev-appl-accum-last-arg
-  (restore argl)
-  (assign argl (op adjoin-arg) (reg val) (reg argl))
-  (restore proc)
-  (goto (label apply-dispatch))
+  (assign proc (op actual-value) (reg exp) (reg env))
 
 apply-dispatch
   (test (op primitive-procedure?) (reg proc))
-  (branch (label primitive-apply))
+  (branch (label handle-primitive-apply))
   (test (op compound-procedure?) (reg proc))
   (branch (label compound-apply))
   (goto (label unknown-procedure-type))
 
+handle-primitive-apply
+  (assign argl (op empty-arglist))
+
+ev-appl-accumulate-forced-arg-loop
+  (assign exp (op first-operand) (reg unev))
+  (assign val (op actual-value) (reg exp) (reg env))
+  (assign argl (op adjoin-arg) (reg val) (reg argl))
+  (assign unev (op rest-operands) (reg unev))
+  (test (op null?) (reg unev))
+  (branch (label primitive-apply))
+  (goto (label ev-appl-accumulate-forced-arg-loop))
+
 primitive-apply
-  (assign val (op apply-primitive-procedure)
-  (reg proc)
-  (reg argl))
-  (restore continue)
+  (assign val (op apply-primitive-procedure) (reg proc) (reg argl))
   (goto (reg continue))
+
+ev-appl-accumulate-delayed-arg-loop
+  (assign exp (op first-operand) (reg unev))
+  (assign val (op delay-it) (reg exp) (reg env))      ;; Delay the argument
+  (assign argl (op adjoin-arg) (reg val) (reg argl))  ;; Add it to the delayed arg list
+  (assign unev (op rest-operands) (reg unev))
+  (test (op null?) (reg unev))
+  (branch (label apply-dispatch))                     ;; When done, go to apply with the delayed arg list in argl and operator in proc.
+  (goto (label ev-appl-accumulate-delayed-arg-loop))
 
 compound-apply
   (assign unev (op procedure-parameters) (reg proc))
