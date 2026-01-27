@@ -134,16 +134,12 @@ ev-sequence-last-exp
   (goto (label eval-dispatch))
 
 ev-if
-  (save exp) ; save expression for later
-  (save env)
-  (save continue)
+  (save exp) ; save expression for later (consequent, alternative evaluation)
   (assign continue (label ev-if-decide))
   (assign exp (op if-predicate) (reg exp))
-  (goto (label eval-dispatch)) ; evaluate the predicate
+  (assign val (op actual-value) (reg exp)) ;; Get actual value of predicate
 
 ev-if-decide
-  (restore continue)
-  (restore env)
   (restore exp)
   (test (op true?) (reg val))
   (branch (label ev-if-consequent))
