@@ -9,11 +9,7 @@
 ;; Update procedure application to use thunks for compound procedures
 ;;   - We must delay argument expressions to compound procedures to allow them to be evaluated later
 ;;   - We will implement our thunks using the method in section 4.2.2 with memoization.
-;;   - We will assume that delay and force are available as machine primitive operations.
-;;   - We will assume that list-of-delayed-args, delay-it, force-it, actual-value, and others are availabe as machine primitive operations.
-;; Steps:
-;; 1. In compound-apply, instead of evaluating the sequence of argument expressions, we should build a delayed list is argument expressions using
-;;    list-of-delayed-args, which builds a list of thunks.
+;;   - We will assume that delay-it, actual-value
 
 eval-dispatch
   (test (op self-evaluating?) (reg exp))
