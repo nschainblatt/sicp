@@ -63,18 +63,20 @@ apply-dispatch
   (test (op primitive-procedure?) (reg proc))
   (branch (label handle-primitive-apply))
   (test (op compound-procedure?) (reg proc))
-  (branch (label compound-apply))
+  (branch (label handle-compound-apply))
   (goto (label unknown-procedure-type))
 
 handle-primitive-apply
   (assign argl (op empty-arglist))
+  (test (op no-operands?) (reg unev))
+  (branch (label primitive-apply))
 
 ev-appl-accumulate-forced-arg-loop
   (assign exp (op first-operand) (reg unev))
   (assign val (op actual-value) (reg exp) (reg env))
   (assign argl (op adjoin-arg) (reg val) (reg argl))
   (assign unev (op rest-operands) (reg unev))
-  (test (op null?) (reg unev))
+  (test (op no-operands?) (reg unev))
   (branch (label primitive-apply))
   (goto (label ev-appl-accumulate-forced-arg-loop))
 
@@ -82,21 +84,29 @@ primitive-apply
   (assign val (op apply-primitive-procedure) (reg proc) (reg argl))
   (goto (reg continue))
 
+handle-compound-apply
+  (assign argl (op empty-arglist))
+  (test (op no-operands?) (reg unev))
+  (branch (label compound-apply))
+
 ev-appl-accumulate-delayed-arg-loop
   (assign exp (op first-operand) (reg unev))
   (assign val (op delay-it) (reg exp) (reg env))      ;; Delay the argument
   (assign argl (op adjoin-arg) (reg val) (reg argl))  ;; Add it to the delayed arg list
   (assign unev (op rest-operands) (reg unev))
-  (test (op null?) (reg unev))
-  (branch (label apply-dispatch))                     ;; When done, go to apply with the delayed arg list in argl and operator in proc.
+  (test (op no-operands?) (reg unev))
+  (branch (label compound-apply))                     ;; When done, go to apply with the delayed arg list in argl and operator in proc.
   (goto (label ev-appl-accumulate-delayed-arg-loop))
 
 compound-apply
   (assign unev (op procedure-parameters) (reg proc))
   (assign env (op procedure-environment) (reg proc))
-  (assign env (op extend-environment)
-  (reg unev) (reg argl) (reg env))
+  (assign env (op extend-environment) (reg unev)
+                                      (reg argl)
+                                      (reg env))
   (assign unev (op procedure-body) (reg proc))
+  (save continue)                                      ;; We must save continue here as ev-sequence expects it to be on the stack, and we removed our
+                                                       ;; previous continue save that was at the beginning of the evaluation.
   (goto (label ev-sequence))
 
 ev-begin
