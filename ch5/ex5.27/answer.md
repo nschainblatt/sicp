@@ -17,7 +17,7 @@ appropriate expressions in terms of n:
 
 |            | Max Depth      | Total Pushes    |
 | ---------- | -------------- | --------------- |
-| Recursive  | (n-1) * 5 + 8  | (n-1) * 32 + 16 |
+| Recursive  | 5n + 3         | 32n - 16        |
 | Iterative  | 10             | 35n + 29        |
 
 The maximum depth is a measure of the amount of space
