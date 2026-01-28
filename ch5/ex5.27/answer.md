@@ -18,10 +18,7 @@ appropriate expressions in terms of n:
 |            | Max Depth      | Total Pushes    |
 | ---------- | -------------- | --------------- |
 | Recursive  | (n-1) * 5 + 8  | (n-1) * 32 + 16 |
-| factorial  |                |                 |
-| ---------- | -------------- | --------------- |
 | Iterative  | 10             | 35n + 29        |
-| factorial  |                |                 |
 
 The maximum depth is a measure of the amount of space
 used by the evaluator in carrying out the computation, and
