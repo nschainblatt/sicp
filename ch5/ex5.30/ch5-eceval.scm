@@ -29,6 +29,7 @@
   (list
    ;;primitive Scheme operations
    (list 'read read)
+   (list 'eq? eq?)
 
    ;;operations in syntax.scm
    (list 'self-evaluating? self-evaluating?)
@@ -145,6 +146,10 @@ ev-self-eval
   (goto (reg continue))
 ev-variable
   (assign val (op lookup-variable-value) (reg exp) (reg env))
+  (assign exp (const ERROR-UNBOUND-VARIABLE-IN-LOOKUP))
+validate-variable-value
+  (test (op eq?) (reg val) (reg exp))
+  (branch (label signal-error))
   (goto (reg continue))
 ev-quoted
   (assign val (op text-of-quotation) (reg exp))
