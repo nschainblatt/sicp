@@ -1,26 +1,28 @@
-;;;;EXPLICIT-CONTROL EVALUATOR FROM SECTION 5.4 OF
-;;;; STRUCTURE AND INTERPRETATION OF COMPUTER PROGRAMS
-
-;;;;Matches code in ch5.scm
-
-;;; To use it
-;;; -- load "load-eceval.scm", which loads this file and the
-;;;    support it needs (including the register-machine simulator)
-
-;;; -- To initialize and start the machine, do
-
-;: (define the-global-environment (setup-environment))
-
-;: (start eceval)
-
-;; To restart, can do just
-;: (start eceval)
-;;;;;;;;;;
-
-
-;;**NB. To [not] monitor stack operations, comment in/[out] the line after
-;; print-result in the machine controller below
-;;**Also choose the desired make-stack version in regsim.scm
+;; Exercise 5.30
+;; a.
+;; I updated these operations:
+;;  - lookup variable
+;;  - set! variable
+;;  - extend-environment
+;; Lookup was simple, I return a unique error code and check it's content in the evaluator, if
+;; the error is set I go to signal-error.
+;;
+;; For the set! operation, I had to modify perform since perform doesn't assign any registers.
+;; I created a new register named errno that will hold the error for perform.
+;; Then back in the evaluator I check the contents and go to signal-error with the context
+;; whenever necessary. I also reset the errno back to 0 (non-error) at the beginning of each
+;; perform if not already 0. This is to make sure that the error handler is reset for the next
+;; instruction which has had an error yet.
+;;
+;; For extend-environment, I return a unique error code similar to lookup.
+;;
+;; Those are all of the evaluation errors we throw, the others errors thrown are in the register
+;; machine, which we want to still throw as the machine language must be correct. We were instructed
+;; in handling the errors from the evaluator itself, not the machine.
+;;
+;;
+;; b.
+;; TODO:
 
 (load "ch5-eceval-support.scm")
 (load "ch5-regsim.scm")
