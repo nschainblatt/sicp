@@ -343,10 +343,10 @@
           (lambda ()
             (let ((err-content (get-register-contents machine 'errno))
                   (set-result (action-proc)))
-              (if (= err-content 1)
+              (if (not (equal? err-content 0))
                 (set-register-contents! machine 'errno 0))
-              (if (eq? set-result 'PERFORM-ERROR)
-                (begin (set-register-contents! machine 'errno 1) (advance-pc pc))
+              (if (and (pair? set-result) (eq? (car set-result) 'PERFORM-ERROR))
+                (begin (set-register-contents! machine 'errno (cdr set-result)) (advance-pc pc))
                 (advance-pc pc)))))
         ;; I don't believe we want to remove these machine language errors
         (error "Bad PERFORM instruction -- ASSEMBLE" inst))))

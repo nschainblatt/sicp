@@ -79,7 +79,7 @@
              (set-car! vals val))
             (else (scan (cdr vars) (cdr vals)))))
     (if (eq? env the-empty-environment)
-        'PERFORM-ERROR
+        (list 'PERFORM-ERROR "variable:" var "is unbound")
         (let ((frame (first-frame env)))
           (scan (frame-variables frame)
                 (frame-values frame)))))

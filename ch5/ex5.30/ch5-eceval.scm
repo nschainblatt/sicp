@@ -31,6 +31,9 @@
    (list 'read read)
    (list '= =)
    (list 'eq? eq?)
+   (list 'equal? equal?)
+   (list 'not not)
+   (list 'cons cons)
 
    ;;operations in syntax.scm
    (list 'self-evaluating? self-evaluating?)
@@ -287,8 +290,9 @@ ev-assignment-1
   (restore unev)
   (perform (op set-variable-value!) (reg unev) (reg val) (reg env))
 validate-assignment
-  (test (op =) (reg errno) (const 1))
-  (assign val (const "ASSIGNMENT-ERROR"))
+  (assign val (op equal?) (reg errno) (const 0))
+  (test (op not) (reg val))
+  (assign val (op cons) (const "ASSIGNMENT-ERROR") (reg errno))
   (branch (label signal-error))
   (assign val (const ok))
   (goto (reg continue))
