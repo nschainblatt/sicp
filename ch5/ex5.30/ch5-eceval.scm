@@ -29,6 +29,7 @@
   (list
    ;;primitive Scheme operations
    (list 'read read)
+   (list '= =)
    (list 'eq? eq?)
 
    ;;operations in syntax.scm
@@ -220,6 +221,10 @@ compound-apply
   (assign env (op procedure-environment) (reg proc))
   (assign env (op extend-environment)
               (reg unev) (reg argl) (reg env))
+validate-extend-environment
+  (test (op eq?) (reg env) (const ERROR-EXTEND-ENVIRONMENT))
+  (assign val (reg env))
+  (branch (label signal-error))
   (assign unev (op procedure-body) (reg proc))
   (goto (label ev-sequence))
 
@@ -280,8 +285,11 @@ ev-assignment-1
   (restore continue)
   (restore env)
   (restore unev)
-  (perform
-   (op set-variable-value!) (reg unev) (reg val) (reg env))
+  (perform (op set-variable-value!) (reg unev) (reg val) (reg env))
+validate-assignment
+  (test (op =) (reg errno) (const 1))
+  (assign val (const "ASSIGNMENT-ERROR"))
+  (branch (label signal-error))
   (assign val (const ok))
   (goto (reg continue))
 

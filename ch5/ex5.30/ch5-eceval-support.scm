@@ -49,8 +49,10 @@
   (if (= (length vars) (length vals))
       (cons (make-frame vars vals) base-env)
       (if (< (length vars) (length vals))
-          (error "Too many arguments supplied" vars vals)
-          (error "Too few arguments supplied" vars vals))))
+        'ERROR-EXTEND-ENVIRONMENT
+        'ERROR-EXTEND-ENVIRONMENT)))
+          ; (error "Too many arguments supplied" vars vals)
+          ; (error "Too few arguments supplied" vars vals))))
 
 
 (define (lookup-variable-value var env)
@@ -77,7 +79,7 @@
              (set-car! vals val))
             (else (scan (cdr vars) (cdr vals)))))
     (if (eq? env the-empty-environment)
-        (error "Unbound variable -- SET!" var)
+        'PERFORM-ERROR
         (let ((frame (first-frame env)))
           (scan (frame-variables frame)
                 (frame-values frame)))))
@@ -102,6 +104,8 @@
          (extend-environment (primitive-procedure-names)
                              (primitive-procedure-objects)
                              the-empty-environment)))
+    (if (eq? initial-env 'ERROR-EXTEND-ENVIRONMENT)
+      (error "Failed to setup initial environment"))
     (define-variable! 'true true initial-env)
     (define-variable! 'false false initial-env)
     initial-env))

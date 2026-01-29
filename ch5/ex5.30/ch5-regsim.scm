@@ -23,8 +23,8 @@
      (assemble controller-text machine))
     machine))
 
-(define (make-register name)
-  (let ((contents '*unassigned*))
+(define (make-register name . args)
+  (let ((contents (if (> (length args) 0) (car args) '*unassigned*)))
     (define (dispatch message)
       (cond ((eq? message 'get) contents)
             ((eq? message 'set)
@@ -108,6 +108,7 @@
 (define (make-new-machine)
   (let ((pc (make-register 'pc))
         (flag (make-register 'flag))
+        (errno (make-register 'errno 0))
         (stack (make-stack))
         (the-instruction-sequence '()))
     (let ((the-ops
@@ -118,7 +119,7 @@
                  (list 'print-stack-statistics
                        (lambda () (stack 'print-statistics)))))
           (register-table
-           (list (list 'pc pc) (list 'flag flag))))
+           (list (list 'pc pc) (list 'flag flag) (list 'errno errno))))
       (define (allocate-register name)
         (if (assoc name register-table)
             (error "Multiply defined register: " name)
@@ -340,8 +341,14 @@
                (make-operation-exp
                 action machine labels operations)))
           (lambda ()
-            (action-proc)
-            (advance-pc pc)))
+            (let ((err-content (get-register-contents machine 'errno))
+                  (set-result (action-proc)))
+              (if (= err-content 1)
+                (set-register-contents! machine 'errno 0))
+              (if (eq? set-result 'PERFORM-ERROR)
+                (begin (set-register-contents! machine 'errno 1) (advance-pc pc))
+                (advance-pc pc)))))
+        ;; I don't believe we want to remove these machine language errors
         (error "Bad PERFORM instruction -- ASSEMBLE" inst))))
 
 (define (perform-action inst) (cdr inst))
