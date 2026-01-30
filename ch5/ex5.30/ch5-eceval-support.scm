@@ -4,6 +4,7 @@
 ;;;;FIRST A LOT FROM 4.1.2-4.1.4
 
 (load "ch5-syntax.scm");               ;section 4.1.2 syntax procedures
+(load-option 'format)
 
 ;;;SECTION 4.1.3
 ;;; operations used by compiled code and eceval except as noted
@@ -115,19 +116,87 @@
 
 (define (primitive-implementation proc) (cadr proc))
 
+;; TODO: wrap each primitive procedure in a lambda function, that will check for applicability, and if it fails we will return a distiguishable error code to primitive apply
+;; in the machine explicit scheme evaluator.
+
+(define (make-error message)
+  (cons 'ERROR message))
+
+(define (my-car . args)
+  (cond ((not (= (length args) 1)) (make-error (format #f "car expects 1 arguments, ~A were given" (length args))))
+        ((null? (car args)) (make-error 'ERROR-CAR-NULL))
+        ((not (pair? (car args))) (make-error 'ERROR-CAR-NOT-PAIR))
+        (else (car (car args)))))
+
+(define (my-cdr . args)
+  (cond ((not (= (length args) 1)) (make-error (format #f "cdr expects 1 arguments, ~A were given" (length args))))
+        ((null? (car args)) (make-error 'ERROR-CDR-NULL))
+        ((not (pair? (car args))) (make-error 'ERROR-CDR-NOT-PAIR))
+        (else (cdr (car args)))))
+
+(define (my-cons . args)
+  (cond ((not (= (length args) 2)) (make-error (format #f "cons expects 2 arguments, ~A were given" (length args))))
+        (else (cons (car args) (cadr args)))))
+
+(define (my-null? . args)
+  (cond ((not (= (length args) 1)) (make-error (format #f "null? expects 2 arguments, ~A were given" (length args))))
+        (else (null? (car args)))))
+
+(define (generic-arithmetic proc args proc-label)
+  (let ((not-nums (filter (lambda (num) (not (number? num))) args)))
+    (cond ((not (null? not-nums)) (make-error (format #f "The object ~A, passed as an argument to ~A, is not the correct type" (car not-nums) proc-label)))
+          (else (apply proc args)))))
+
+(define (my-add . args)
+  (if (null? args)
+    (+)
+    (generic-arithmetic + args "integer-add")))
+
+(define (my-sub . args)
+  (if (null? args)
+    (make-error (format #f "integer-negate has been called with 0 arguments, it requires at least 1 argument"))
+    (generic-arithmetic - args "integer-negate")))
+
+(define (my-multiplier . args)
+  (if (null? args)
+    (*)
+    (generic-arithmetic * args "*")))
+
+(define (my-divider . args)
+  (cond ((null? args) (make-error (format #f "/ has been called with 0 arguments, it requires at least 1 argument")))
+        ((= (length args) 1) (generic-arithmetic / args "/"))
+        ((and (number? (cadr args)) (= (cadr args) 0)) (make-error "Division by zero signalled by /"))
+        (else (generic-arithmetic / args "/"))))
+
+(define (my-integer-equals? . args)
+  (if (null? args)
+    (=)
+    (generic-arithmetic = args "integer-equals?")))
+
+(define (my-integer-greater? . args)
+  (if (null? args)
+    (>)
+    (generic-arithmetic > args "integer-greater?")))
+
+(define (my-integer-less? . args)
+  (if (null? args)
+    (<)
+    (generic-arithmetic < args "integer-less?")))
+
 (define primitive-procedures
-  (list (list 'car car)
-        (list 'cdr cdr)
-        (list 'cons cons)
-        (list 'null? null?)
+  (list (list 'car my-car)
+        (list 'cdr my-cdr)
+        (list 'cons my-cons)
+        (list 'list list) ;; doesn't need a wrapper, no arguments are required
+        (list 'null? my-null?)
 	;;above from book -- here are some more
-	(list '+ +)
-	(list '- -)
-	(list '* *)
-	(list '= =)
-	(list '/ /)
-	(list '> >)
-	(list '< <)
+	(list '+ my-add)
+	(list '- my-sub)
+	(list '* my-multiplier)
+	(list '= my-integer-equals?)
+	(list '/ my-divider)
+	(list '> my-integer-greater?)
+	(list '< my-integer-less?)
         ))
 
 (define (primitive-procedure-names)

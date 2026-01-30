@@ -22,7 +22,11 @@
 ;;
 ;;
 ;; b.
-;; TODO:
+;; I implemented primitive procedure error handling by wrapping each primitive given to the evaluator language (not the register machine)
+;; to return an appropriate error to the evaluator. This prevents the entire program from crashing back to the underlying scheme interpreter which forces a restart.
+;; In the evaluator machine, I check the contents of val after applying the primitive, and checking if the return value qualifies as an error (if it's a pair and it's
+;; car is 'ERROR).
+
 
 (load "ch5-eceval-support.scm")
 (load "ch5-regsim.scm")
@@ -36,6 +40,9 @@
    (list 'equal? equal?)
    (list 'not not)
    (list 'cons cons)
+   (list 'car car)
+   (list 'cdr cdr)
+   (list 'pair? pair?)
 
    ;;operations in syntax.scm
    (list 'self-evaluating? self-evaluating?)
@@ -218,6 +225,17 @@ primitive-apply
   (assign val (op apply-primitive-procedure)
               (reg proc)
               (reg argl))
+validate-primitive-apply ;; here we check if the value of primitive application contains an error
+  (assign unev (reg val)) ;; save val in tmp if no error raised
+  (assign exp (op pair?) (reg val))
+  (test (op not) (reg exp))
+  (branch (label primitive-apply-success))
+  (assign exp (op car) (reg val))
+  (test (op eq?) (reg exp) (const 'ERROR))
+  (assign val (op cdr) (reg val))
+  (branch (label signal-error))
+primitive-apply-success
+  (assign val (reg unev))
   (restore continue)
   (goto (reg continue))
 
