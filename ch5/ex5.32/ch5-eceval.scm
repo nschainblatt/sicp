@@ -50,6 +50,7 @@
    (list 'last-exp? last-exp?)
    (list 'first-exp first-exp)
    (list 'rest-exps rest-exps)
+   (list 'operator-variable-application? operator-variable-application?)
    (list 'application? application?)
    (list 'operator operator)
    (list 'operands operands)
@@ -133,6 +134,8 @@ eval-dispatch
   (branch (label ev-lambda))
   (test (op begin?) (reg exp))
   (branch (label ev-begin))
+  (test (op operator-variable-application?) (reg exp))
+  (branch (label ev-operator-variable-application))
   (test (op application?) (reg exp))
   (branch (label ev-application))
   (goto (label unknown-expression-type))
@@ -152,6 +155,17 @@ ev-lambda
   (assign val (op make-procedure)
               (reg unev) (reg exp) (reg env))
   (goto (reg continue))
+
+ev-operator-variable-application
+  (save continue)
+  (assign unev (op operands) (reg exp))
+  (assign exp (op operator) (reg exp))
+  (assign proc (op lookup-variable-value) (reg exp) (reg env))
+  (assign argl (op empty-arglist))
+  (test (op no-operands?) (reg unev))
+  (branch (label apply-dispatch))
+  (save proc)
+  (goto (label ev-appl-operand-loop))
 
 ev-application
   (save continue)

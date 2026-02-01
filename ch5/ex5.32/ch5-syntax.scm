@@ -72,6 +72,8 @@
 (define (rest-exps seq) (cdr seq))
 
 (define (application? exp) (pair? exp))
+(define (operator-variable-application? exp)
+  (and (pair? exp) (variable? (operator exp))))
 (define (operator exp) (car exp))
 (define (operands exp) (cdr exp))
 
