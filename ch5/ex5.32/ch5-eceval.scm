@@ -22,6 +22,21 @@
 ;; print-result in the machine controller below
 ;;**Also choose the desired make-stack version in regsim.scm
 
+;; a.
+;; I created new syntax procedures and a predicate for an application where the operator is a variable.
+;; I created a new evaluation handler of this type of applicaiton that removes unnecessary saves and restores
+;; of the env and unev registers. This is significant, especially in large procedures that are either
+;; recursive or call lots of procedures.
+
+;; b.
+;; Alyssa P. Hacker is incorrect. While we could create special handlers for edge cases like this one and would
+;; save lots of stack operations, we still are limited because we must process the semantic meaning of each expression and
+;; convert it to machine language at runtime. A compiler does this part at compile time and turns it into machine code.
+;; Thus at runtime, a compiled program is still much more efficient than an interpreted one.
+;; Our evaluator would still be missing the preserving optimization (where the compiler inspects the machine instructions and removes unnecessary stack operations).
+;; Alyssa's optimizations would be helpful during our evaluators edge cases, but wouldn't cover all possible code coverage like the preserving optimization would.
+;; I imagine there are plenty more optimizations a compiler brings that has not been mentioned yet in the book.
+
 (define eceval-operations
   (list
    ;;primitive Scheme operations
