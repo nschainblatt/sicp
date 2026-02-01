@@ -1,6 +1,18 @@
 ;; Initial:
 ;; The iterative code output is decently longer due to the larger number of scheme expressions to compile (two procedures instead of one).
-;; 
+
+;; The iterative version treats the inner iter procedure as a loop until the base case is met. This loop still saves the same registers as the recursive process
+;; but it doesn't have to wait until the recursive operands evaluate to restore them. The iterative process can restore the saved registers immediately after all
+;; operands have been evaluated. This is what allows the iterative process to have constant stack space.
+
+;; The recursive process however doesn't restore it's registers until after the recursive operands have been evaluated. This is what expands the stack restricting
+;; the recursive process from having constant stack space (max depth).
+
+;; Example with register 'argl':
+;; In the iterative process, we save and restore the 'argl' in between evaluating the operands of each procedure, and since we don't perform any recursive calls
+;; in the operands, we restore the argl right after in order to apply the procedures '*' and '+'. Thus allowing us to jump back to iter without having any registers saved on the stack.
+;; While in the recursive process, we save argl just the same as the iterative process, however we don't restore until after all the recursive operands have been evaluated, which happens all the way down until
+;; the base case. This is what expands the stack disallowing for constant space like the iterative process.
 
 ;; Iterative
 (compile '(define (factorial n)
