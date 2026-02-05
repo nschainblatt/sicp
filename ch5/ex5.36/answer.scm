@@ -44,7 +44,7 @@
   (let ((code-for-next-arg
          (preserving '(argl)
           (car operand-codes)
-          (make-instruction-sequence '(val argl) '(argl)
+          (make-instruction-sequence '(val argl) '(val argl)
            '((assign val (op list) (reg val)) ;; We must place val in a list in order to use with append.
              (assign argl (op append) (reg argl) (reg val)))))))
     (if (null? (cdr operand-codes))
