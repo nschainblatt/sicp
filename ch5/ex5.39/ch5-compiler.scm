@@ -18,12 +18,18 @@
 (define UNASSIGNED '*unassigned)
 
 (define (lexical-address-lookup lexical-address env)
-  (let ((value (frame-scan (lexical-address-displacement-number lexical-address)
+  (let ((value (car (frame-scan (lexical-address-displacement-number lexical-address)
                            (env-scan (lexical-address-frame-number lexical-address)
-                                     env))))
+                                     env)))))
     (if (eq? value UNASSIGNED)
       (error "Error: accessing a variable whose value is unassigned LEXICAL-ADDRESS-LOOKUP")
       value)))
+
+(define (lexical-address-set! lexical-address env value)
+  (let ((value-pair (frame-scan (lexical-address-displacement-number lexical-address)
+                                (env-scan (lexical-address-frame-number lexical-address)
+                                          env))))
+    (set-car! value-pair value)))
 
 ;; Returns the frame located frame-number frames from env.
 (define (env-scan frame-number env)
@@ -35,10 +41,12 @@
     (error "Error: frame-number cannot be larger than the number of frames ENV-SCAN")
     (iter frame-number env)))
 
+;; Returns a pair containing the value of the variable at the displacement-number.
+;; Returning a pair to allow set! operations to be performed and modify the enclosing environment.
 (define (frame-scan displacement-number frame)
   (define (iter index vals)
     (if (= index 0)
-      (car vals)
+      vals
       (iter (- index 1) (cdr vals))))
   (if (> displacement-number (number-of-bindings frame))
     (error "Error: displacement-number cannot be larger than the number of bindings in the frame FRAME-SCAN")
@@ -419,5 +427,6 @@
 (define env1 (extend-environment '(a) '(1) the-empty-environment))
 (define env2 (extend-environment '(b) '(2) env1))
 
+(lexical-address-set! (make-lexical-address 1 0) env2 2)
 (newline)
 (display (lexical-address-lookup (make-lexical-address 1 0) env2))
