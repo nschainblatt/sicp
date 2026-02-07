@@ -13,6 +13,43 @@
 
 ;;**implementation-dependent loading of syntax procedures
 (load "ch5-syntax.scm")			;section 4.1.2 syntax procedures
+(load "ch5-eceval-support.scm")
+
+(define UNASSIGNED '*unassigned)
+
+(define (lexical-address-lookup lexical-address env)
+  (let ((value (frame-scan (lexical-address-displacement-number lexical-address)
+                           (env-scan (lexical-address-frame-number lexical-address)
+                                     env))))
+    (if (eq? value UNASSIGNED)
+      (error "Error: accessing a variable whose value is unassigned LEXICAL-ADDRESS-LOOKUP")
+      value)))
+
+;; Returns the frame located frame-number frames from env.
+(define (env-scan frame-number env)
+  (define (iter index curr)
+    (if (= index 0)
+      (first-frame curr)
+      (iter (- index 1) (enclosing-environment curr))))
+  (if (> frame-number (number-of-environments env))
+    (error "Error: frame-number cannot be larger than the number of frames ENV-SCAN")
+    (iter frame-number env)))
+
+(define (frame-scan displacement-number frame)
+  (define (iter index vals)
+    (if (= index 0)
+      (car vals)
+      (iter (- index 1) (cdr vals))))
+  (if (> displacement-number (number-of-bindings frame))
+    (error "Error: displacement-number cannot be larger than the number of bindings in the frame FRAME-SCAN")
+    (iter displacement-number (frame-values frame))))
+
+(define (make-lexical-address frame-number displacement-number)
+  (cons frame-number displacement-number))
+(define (lexical-address-frame-number lexical-address)
+  (car lexical-address))
+(define (lexical-address-displacement-number lexical-address)
+  (cdr lexical-address))
 
 
 ;;;SECTION 5.5.1
@@ -378,3 +415,9 @@
    (append (statements seq1) (statements seq2))))
 
 '(COMPILER LOADED)
+
+(define env1 (extend-environment '(a) '(1) the-empty-environment))
+(define env2 (extend-environment '(b) '(2) env1))
+
+(newline)
+(display (lexical-address-lookup (make-lexical-address 1 0) env2))
