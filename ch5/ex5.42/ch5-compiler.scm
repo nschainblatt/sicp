@@ -153,15 +153,16 @@
                 (reg env)))))))
 
 (define (compile-assignment exp target linkage compile-time-env)
-  (let ((var (assignment-variable exp))
+  (let* ((var (assignment-variable exp))
         (get-value-code
-         (compile (assignment-value exp) 'val 'next compile-time-env)))
+         (compile (assignment-value exp) 'val 'next compile-time-env))
+        (lexical-address (find-variable var compile-time-env)))
     (end-with-linkage linkage
      (preserving '(env)
       get-value-code
       (make-instruction-sequence '(env val) (list target)
-       `((perform (op set-variable-value!)
-                  (const ,var)
+       `((perform (op lexical-address-set!)
+                  (const ,lexical-address)
                   (reg val)
                   (reg env))
          (assign ,target (const ok))))))))
@@ -447,7 +448,7 @@
 (newline)
 (display (compile '((lambda (x y)
                       (lambda (a b c d e)
-                        ((lambda (y z) (* x y z))
+                        ((lambda (y z) (set! z x))
                          (* a b x)
                          (+ c d x))))
                     3
