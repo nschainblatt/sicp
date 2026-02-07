@@ -22,6 +22,43 @@
       (begin (display (car a)) (display " ") (init (cdr a)))))
   (init args))
 
+(define (adder-generator exp target linkage)
+  (define (add-operand-codes op-codes result)
+    (if (null? op-codes)
+      result
+      (add-operand-codes (cdr op-codes)
+                         (append-instruction-sequences
+                           result
+                           (preserving '(val)
+                                       (car op-codes)
+                                       (make-instruction-sequence '(val arg1) '(val) '((assign val (op +) (reg val) (reg arg1)))))))))
+  (let ((operand-codes (spread-operands (adder-operands exp))))
+    (if (null? operand-codes)
+      (end-with-linkage linkage
+                        (make-instruction-sequence '() '(val) '((assign val (const 0)))))
+      (if (eq? target 'val) ;; the result will already be in val, so no need to assign to target.
+        (end-with-linkage linkage
+                          (add-operand-codes (cdr operand-codes) (car operand-codes)))
+        (end-with-linkage linkage (append-instruction-sequences
+                                    (add-operand-codes (cdr operand-codes) (car operand-codes))
+                                    (make-instruction-sequence '() '() `((assign ,target (reg val))))))))))
+
+(define (adder? exp)
+  (tagged-list? exp '+))
+(define (adder-operands exp)
+  (cdr exp))
+
+(define (spread-operands operands)
+  (if (null? operands)
+    '()
+    (mapper (cdr operands) (list (compile (car operands) 'val 'next)))))
+
+(define (mapper operands result)
+  (if (null? operands)
+    result
+    (mapper (cdr operands) (append result (list (compile (car operands) 'arg1 'next))))))
+
+
 
 ;;;SECTION 5.5.1
 
@@ -42,6 +79,7 @@
                            target
                            linkage))
         ((cond? exp) (compile (cond->if exp) target linkage))
+        ((adder? exp) (adder-generator exp target linkage))
         ((application? exp)
          (compile-application exp target linkage))
         (else
@@ -386,3 +424,5 @@
    (append (statements seq1) (statements seq2))))
 
 '(COMPILER LOADED)
+
+(println (compile '(+ 1 (+ 2 3) 4) 'val 'next))
