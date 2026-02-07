@@ -17,6 +17,20 @@
 
 (define UNASSIGNED '*unassigned)
 
+(define (find-variable var compile-time-env)
+  (define (env-iter env-index env)
+    (if (null? env)
+      'not-found
+      (let ((frame-index (frame-iter 0 (first-frame env))))
+        (if frame-index
+          (make-lexical-address env-index frame-index)
+          (env-iter (+ env-index 1) (enclosing-environment env))))))
+  (define (frame-iter index vars)
+    (cond ((null? vars) #f)
+          ((eq? var (car vars)) index)
+          (else (frame-iter (+ index 1) (cdr vars)))))
+  (env-iter 0 compile-time-env))
+
 (define (lexical-address-lookup lexical-address env)
   (let ((value (car (frame-scan (lexical-address-displacement-number lexical-address)
                            (env-scan (lexical-address-frame-number lexical-address)
@@ -62,9 +76,7 @@
 ;; Compile time environment
 (define the-empty-compile-time-env '())
 (define (extend-compile-time-environment vars env)
-  (cons (make-compile-time-frame vars) env))
-(define (make-compile-time-frame vars)
-  (list vars))
+  (cons vars env))
 
 ;;;SECTION 5.5.1
 
@@ -431,4 +443,17 @@
 
 '(COMPILER LOADED)
 
-(display (compile '(lambda (a) (+ 1 a 3)) 'val 'next the-empty-compile-time-env))
+(newline)
+(display '((y z) (a b c d e) (x y)))
+(newline)
+(display (find-variable 'c '((y z) (a b c d e) (x y))))
+
+(newline)
+(display '((y z) (a b c d e) (x y)))
+(newline)
+(display (find-variable 'x '((y z) (a b c d e) (x y))))
+
+(newline)
+(display '((y z) (a b c d e) (x y)))
+(newline)
+(display (find-variable 'w '((y z) (a b c d e) (x y))))
