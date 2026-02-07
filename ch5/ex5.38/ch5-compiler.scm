@@ -68,7 +68,7 @@
       (operate-operand-codes operator (cdr op-codes)
                            (append-instruction-sequences
                              result
-                             (preserving '(val)
+                             (preserving '(val env)
                                          (car op-codes)
                                          (make-instruction-sequence '(val arg1) '(val) `((assign val (op ,operator) (reg val) (reg arg1)))))))))
 
