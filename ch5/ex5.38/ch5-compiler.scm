@@ -14,60 +14,46 @@
 ;;**implementation-dependent loading of syntax procedures
 (load "ch5-syntax.scm")			;section 4.1.2 syntax procedures
 
-(define (println . args)
-  (newline)
-  (define (init a)
-    (if (null? a)
-      'done
-      (begin (display (car a)) (display " ") (init (cdr a)))))
-  (init args))
+;; Code generators
 
+;; Allows any number of operands
 (define (adder-generator exp target linkage)
   (let ((operand-codes (spread-operands (adder-operands exp))))
     (if (null? operand-codes)
       (end-with-linkage linkage
                         (make-instruction-sequence '() '(val) '((assign val (const 0)))))
-      (if (eq? target 'val) ;; the result will already be in val, so no need to assign to target.
-        (end-with-linkage linkage
-                          (operate-operand-codes '+ (cdr operand-codes) (car operand-codes)))
-        (end-with-linkage linkage (append-instruction-sequences
-                                    (operate-operand-codes '+ (cdr operand-codes) (car operand-codes))
-                                    (make-instruction-sequence '() '() `((assign ,target (reg val))))))))))
-
-(define (adder? exp)
-  (tagged-list? exp '+))
-(define (adder-operands exp)
-  (cdr exp))
-
-  
+      (code-generator '+ operand-codes target linkage))))
 
 ;; Expects only two operands
 (define (equals-generator exp target linkage)
   (let ((operand-codes (spread-operands (equal-operands exp))))
     (cond ((null? operand-codes) (end-with-linkage linkage (make-instruction-sequence '() '(val) '((assign val (const #t))))))
           ((not (= (length operand-codes) 2)) (error "Integer equal (=) must have 0 or two operands"))
-          (else
-            (if (eq? target 'val) ;; the result will already be in val, so no need to assign to target.
-              (end-with-linkage linkage
-                                (operate-operand-codes '= (cdr operand-codes) (car operand-codes)))
-              (end-with-linkage linkage (append-instruction-sequences
-                                          (operate-operand-codes '= (cdr operand-codes) (car operand-codes))
-                                          (make-instruction-sequence '() '() `((assign ,target (reg val)))))))))))
+          (else (code-generator '= operand-codes target linkage)))))
 
-(define (integer-equal? exp)
-  (tagged-list? exp '=))
-(define (equal-operands exp)
-  (cdr exp))
 
+;; Allows any number of operands
+(define (multiplier-generator exp target linkage)
+  (let ((operand-codes (spread-operands (multiplier-operands exp))))
+    (if (null? operand-codes)
+      (end-with-linkage linkage
+                        (make-instruction-sequence '() '(val) '((assign val (const 1)))))
+      (code-generator '* operand-codes target linkage))))
+
+;; Uses val as the accumulator register
 (define (spread-operands operands)
   (if (null? operands)
     '()
-    (mapper (cdr operands) (list (compile (car operands) 'val 'next)))))
+    (cons (compile (car operands) 'val 'next)
+          (map (lambda (operand) (compile operand 'arg1 'next)) (cdr operands)))))
 
-(define (mapper operands result)
-  (if (null? operands)
-    result
-    (mapper (cdr operands) (append result (list (compile (car operands) 'arg1 'next))))))
+(define (code-generator operator operand-codes target linkage)
+  (if (eq? target 'val) ;; the result will already be in val, so no need to assign to target.
+    (end-with-linkage linkage
+                      (operate-operand-codes operator (cdr operand-codes) (car operand-codes)))
+    (end-with-linkage linkage (append-instruction-sequences
+                                (operate-operand-codes operator (cdr operand-codes) (car operand-codes))
+                                (make-instruction-sequence '() '() `((assign ,target (reg val))))))))
 
 (define (operate-operand-codes operator op-codes result)
     (if (null? op-codes)
@@ -78,6 +64,23 @@
                              (preserving '(val)
                                          (car op-codes)
                                          (make-instruction-sequence '(val arg1) '(val) `((assign val (op ,operator) (reg val) (reg arg1)))))))))
+
+;; Predicates and selectors for primitive code generators
+
+(define (adder? exp)
+  (tagged-list? exp '+))
+(define (adder-operands exp)
+  (cdr exp))
+
+(define (integer-equal? exp)
+  (tagged-list? exp '=))
+(define (equal-operands exp)
+  (cdr exp))
+
+(define (multiplier? exp)
+  (tagged-list? exp '*))
+(define (multiplier-operands exp)
+  (cdr exp))
 
 
 ;;;SECTION 5.5.1
@@ -100,6 +103,7 @@
                            linkage))
         ((cond? exp) (compile (cond->if exp) target linkage))
         ((adder? exp) (adder-generator exp target linkage))
+        ((multiplier? exp) (multiplier-generator exp target linkage))
         ((integer-equal? exp) (equals-generator exp target linkage))
         ((application? exp)
          (compile-application exp target linkage))
@@ -446,5 +450,14 @@
 
 '(COMPILER LOADED)
 
+(define (println . args)
+  (newline)
+  (define (init a)
+    (if (null? a)
+      'done
+      (begin (display (car a)) (display " ") (init (cdr a)))))
+  (init args))
+
 (println (compile '(= 1 (+ 1 2)) 'val 'next))
 (println (compile '(+ 1 (+ 1 2) 4) 'val 'next))
+(println (compile '(* 1 (* 1 2) 4) 'val 'next))
