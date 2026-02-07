@@ -40,6 +40,13 @@
                         (make-instruction-sequence '() '(val) '((assign val (const 1)))))
       (code-generator '* operand-codes target linkage))))
 
+;; Allows any number of operands
+(define (subtraction-generator exp target linkage)
+  (let ((operand-codes (spread-operands (subtraction-operands exp))))
+    (if (null? operand-codes)
+      (error "Subtraction (-) must have at least 1 operand")
+      (code-generator '- operand-codes target linkage))))
+
 ;; Uses val as the accumulator register
 (define (spread-operands operands)
   (if (null? operands)
@@ -82,6 +89,10 @@
 (define (multiplier-operands exp)
   (cdr exp))
 
+(define (subtraction? exp)
+  (tagged-list? exp '-))
+(define (subtraction-operands exp)
+  (cdr exp))
 
 ;;;SECTION 5.5.1
 
@@ -103,6 +114,7 @@
                            linkage))
         ((cond? exp) (compile (cond->if exp) target linkage))
         ((adder? exp) (adder-generator exp target linkage))
+        ((subtraction? exp) (subtraction-generator exp target linkage))
         ((multiplier? exp) (multiplier-generator exp target linkage))
         ((integer-equal? exp) (equals-generator exp target linkage))
         ((application? exp)
@@ -460,4 +472,5 @@
 
 (println (compile '(= 1 (+ 1 2)) 'val 'next))
 (println (compile '(+ 1 (+ 1 2) 4) 'val 'next))
+(println (compile '(- 1 4 3) 'val 'next))
 (println (compile '(* 1 (* 1 2) 4) 'val 'next))
