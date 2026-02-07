@@ -59,28 +59,35 @@
 (define (lexical-address-displacement-number lexical-address)
   (cdr lexical-address))
 
+;; Compile time environment
+(define the-empty-compile-time-env '())
+(define (extend-compile-time-environment vars env)
+  (cons (make-compile-time-frame vars) env))
+(define (make-compile-time-frame vars)
+  (list vars))
 
 ;;;SECTION 5.5.1
 
-(define (compile exp target linkage)
+(define (compile exp target linkage compile-time-env)
   (cond ((self-evaluating? exp)
          (compile-self-evaluating exp target linkage))
         ((quoted? exp) (compile-quoted exp target linkage))
         ((variable? exp)
          (compile-variable exp target linkage))
         ((assignment? exp)
-         (compile-assignment exp target linkage))
+         (compile-assignment exp target linkage compile-time-env))
         ((definition? exp)
-         (compile-definition exp target linkage))
-        ((if? exp) (compile-if exp target linkage))
-        ((lambda? exp) (compile-lambda exp target linkage))
+         (compile-definition exp target linkage compile-time-env))
+        ((if? exp) (compile-if exp target linkage compile-time-env))
+        ((lambda? exp) (compile-lambda exp target linkage compile-time-env))
         ((begin? exp)
          (compile-sequence (begin-actions exp)
                            target
-                           linkage))
+                           linkage
+                           compile-time-env))
         ((cond? exp) (compile (cond->if exp) target linkage))
         ((application? exp)
-         (compile-application exp target linkage))
+         (compile-application exp target linkage compile-time-env))
         (else
          (error "Unknown expression type -- COMPILE" exp))))
 
@@ -132,10 +139,10 @@
               (const ,exp)
               (reg env))))))
 
-(define (compile-assignment exp target linkage)
+(define (compile-assignment exp target linkage compile-time-env)
   (let ((var (assignment-variable exp))
         (get-value-code
-         (compile (assignment-value exp) 'val 'next)))
+         (compile (assignment-value exp) 'val 'next compile-time-env)))
     (end-with-linkage linkage
      (preserving '(env)
       get-value-code
@@ -146,10 +153,10 @@
                   (reg env))
          (assign ,target (const ok))))))))
 
-(define (compile-definition exp target linkage)
+(define (compile-definition exp target linkage compile-time-env)
   (let ((var (definition-variable exp))
         (get-value-code
-         (compile (definition-value exp) 'val 'next)))
+         (compile (definition-value exp) 'val 'next compile-time-env)))
     (end-with-linkage linkage
      (preserving '(env)
       get-value-code
@@ -176,18 +183,18 @@
                    (number->string (new-label-number)))))
 ;; end of footnote
 
-(define (compile-if exp target linkage)
+(define (compile-if exp target linkage compile-time-env)
   (let ((t-branch (make-label 'true-branch))
         (f-branch (make-label 'false-branch))                    
         (after-if (make-label 'after-if)))
     (let ((consequent-linkage
            (if (eq? linkage 'next) after-if linkage)))
-      (let ((p-code (compile (if-predicate exp) 'val 'next))
+      (let ((p-code (compile (if-predicate exp) 'val 'next compile-time-env))
             (c-code
              (compile
-              (if-consequent exp) target consequent-linkage))
+              (if-consequent exp) target consequent-linkage compile-time-env))
             (a-code
-             (compile (if-alternative exp) target linkage)))
+             (compile (if-alternative exp) target linkage compile-time-env)))
         (preserving '(env continue)
          p-code
          (append-instruction-sequences
@@ -201,16 +208,16 @@
 
 ;;; sequences
 
-(define (compile-sequence seq target linkage)
+(define (compile-sequence seq target linkage compile-time-env)
   (if (last-exp? seq)
-      (compile (first-exp seq) target linkage)
+      (compile (first-exp seq) target linkage compile-time-env)
       (preserving '(env continue)
-       (compile (first-exp seq) target 'next)
-       (compile-sequence (rest-exps seq) target linkage))))
+       (compile (first-exp seq) target 'next compile-time-env)
+       (compile-sequence (rest-exps seq) target linkage compile-time-env))))
 
 ;;;lambda expressions
 
-(define (compile-lambda exp target linkage)
+(define (compile-lambda exp target linkage compile-time-env)
   (let ((proc-entry (make-label 'entry))
         (after-lambda (make-label 'after-lambda)))
     (let ((lambda-linkage
@@ -223,11 +230,11 @@
                     (op make-compiled-procedure)
                     (label ,proc-entry)
                     (reg env)))))
-        (compile-lambda-body exp proc-entry))
+        (compile-lambda-body exp proc-entry compile-time-env))
        after-lambda))))
 
-(define (compile-lambda-body exp proc-entry)
-  (let ((formals (lambda-parameters exp)))
+(define (compile-lambda-body exp proc-entry compile-time-env)
+  (let ((formals (lambda-parameters exp))) 
     (append-instruction-sequences
      (make-instruction-sequence '(env proc argl) '(env)
       `(,proc-entry
@@ -237,17 +244,17 @@
                 (const ,formals)
                 (reg argl)
                 (reg env))))
-     (compile-sequence (lambda-body exp) 'val 'return))))
+     (compile-sequence (lambda-body exp) 'val 'return (extend-compile-time-environment formals compile-time-env)))))
 
 
 ;;;SECTION 5.5.3
 
 ;;;combinations
 
-(define (compile-application exp target linkage)
-  (let ((proc-code (compile (operator exp) 'proc 'next))
+(define (compile-application exp target linkage compile-time-env)
+  (let ((proc-code (compile (operator exp) 'proc 'next compile-time-env))
         (operand-codes
-         (map (lambda (operand) (compile operand 'val 'next))
+         (map (lambda (operand) (compile operand 'val 'next compile-time-env))
               (operands exp))))
     (preserving '(env continue)
      proc-code
@@ -423,3 +430,5 @@
    (append (statements seq1) (statements seq2))))
 
 '(COMPILER LOADED)
+
+(display (compile '(lambda (a) (+ 1 a 3)) 'val 'next the-empty-compile-time-env))
