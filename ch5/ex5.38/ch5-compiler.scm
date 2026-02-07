@@ -14,6 +14,14 @@
 ;;**implementation-dependent loading of syntax procedures
 (load "ch5-syntax.scm")			;section 4.1.2 syntax procedures
 
+(define (println . args)
+  (newline)
+  (define (init a)
+    (if (null? a)
+      'done
+      (begin (display (car a)) (display " ") (init (cdr a)))))
+  (init args))
+
 
 ;;;SECTION 5.5.1
 
