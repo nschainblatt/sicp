@@ -17,36 +17,66 @@
 
 ;; Code generators
 
+(define (check-for-primitive-implementation exp target linkage compile-time-env primitive-callback)
+  (let ((var (find-variable '+ compile-time-env)))
+    (if (not (eq? var 'not-found))
+      (compile-application (cons (operator exp) (adder-operands exp)) target linkage compile-time-env)
+      (primitive-callback))))
+
 ;; Allows any number of operands
 (define (adder-generator exp target linkage compile-time-env)
-  (let ((operand-codes (spread-operands (adder-operands exp) compile-time-env)))
-    (if (null? operand-codes)
-      (end-with-linkage linkage
-                        (make-instruction-sequence '() '(val) '((assign val (const 0)))))
-      (code-generator '+ operand-codes target linkage))))
+  (check-for-primitive-implementation
+    exp
+    target
+    linkage
+    compile-time-env
+    (lambda ()
+      (let ((operand-codes (spread-operands (adder-operands exp) compile-time-env)))
+        (if (null? operand-codes)
+          (end-with-linkage linkage
+                            (make-instruction-sequence '() '(val) '((assign val (const 0)))))
+          (code-generator '+ operand-codes target linkage))))))
 
 ;; Expects only two operands
 (define (equals-generator exp target linkage compile-time-env)
-  (let ((operand-codes (spread-operands (equal-operands exp) compile-time-env)))
-    (cond ((null? operand-codes) (end-with-linkage linkage (make-instruction-sequence '() '(val) '((assign val (const #t))))))
-          ((not (= (length operand-codes) 2)) (error "Integer equal (=) must have 0 or two operands"))
-          (else (code-generator '= operand-codes target linkage)))))
+  (check-for-primitive-implementation
+    exp
+    target
+    linkage
+    compile-time-env
+    (lambda ()
+      (let ((operand-codes (spread-operands (equal-operands exp) compile-time-env)))
+        (cond ((null? operand-codes) (end-with-linkage linkage (make-instruction-sequence '() '(val) '((assign val (const #t))))))
+              ((not (= (length operand-codes) 2)) (error "Integer equal (=) must have 0 or two operands"))
+              (else (code-generator '= operand-codes target linkage)))))))
 
 
 ;; Allows any number of operands
 (define (multiplier-generator exp target linkage compile-time-env)
-  (let ((operand-codes (spread-operands (multiplier-operands exp) compile-time-env)))
-    (if (null? operand-codes)
-      (end-with-linkage linkage
-                        (make-instruction-sequence '() '(val) '((assign val (const 1)))))
-      (code-generator '* operand-codes target linkage))))
+  (check-for-primitive-implementation
+    exp
+    target
+    linkage
+    compile-time-env
+    (lambda ()
+      (let ((operand-codes (spread-operands (multiplier-operands exp) compile-time-env)))
+        (if (null? operand-codes)
+          (end-with-linkage linkage
+                            (make-instruction-sequence '() '(val) '((assign val (const 1)))))
+          (code-generator '* operand-codes target linkage))))))
 
 ;; Allows any number of operands
 (define (subtraction-generator exp target linkage compile-time-env)
-  (let ((operand-codes (spread-operands (subtraction-operands exp) compile-time-env)))
-    (if (null? operand-codes)
-      (error "Subtraction (-) must have at least 1 operand")
-      (code-generator '- operand-codes target linkage))))
+  (check-for-primitive-implementation
+    exp
+    target
+    linkage
+    compile-time-env
+    (lambda ()
+      (let ((operand-codes (spread-operands (subtraction-operands exp) compile-time-env)))
+        (if (null? operand-codes)
+          (error "Subtraction (-) must have at least 1 operand")
+          (code-generator '- operand-codes target linkage))))))
 
 ;; Uses val as the accumulator register
 (define (spread-operands operands compile-time-env)
@@ -351,15 +381,24 @@
          (internal-definition-variables (cdr body-internal-definition-pair))
          (formals (append (lambda-parameters exp) internal-definition-variables)))
     (append-instruction-sequences
-     (make-instruction-sequence '(env proc argl) '(env argl)
-      `(,proc-entry
-        (assign env (op compiled-procedure-env) (reg proc))
-        (assign argl (op append) (reg argl) (const ,(map (lambda (def) UNASSIGNED) internal-definition-variables))) ;; ensure the vars are unassigned, to be set! by the new-body.
-        (assign env
-                (op extend-environment)
-                (const ,formals) ;; add the internal definition variables to the end
-                (reg argl)
-                (reg env))))
+      (if (not (null? internal-definition-variables))
+       (make-instruction-sequence '(env proc argl) '(env argl)
+        `(,proc-entry
+          (assign env (op compiled-procedure-env) (reg proc))
+          (assign argl (op append) (reg argl) (const ,(map (lambda (def) UNASSIGNED) internal-definition-variables))) ;; ensure the vars are unassigned, to be set! by the new-body.
+          (assign env
+                  (op extend-environment)
+                  (const ,formals) ;; add the internal definition variables to the end
+                  (reg argl)
+                  (reg env))))
+        (make-instruction-sequence '(env proc argl) '(env argl)
+                `(,proc-entry
+                  (assign env (op compiled-procedure-env) (reg proc))
+                  (assign env
+                          (op extend-environment)
+                          (const ,formals) ;; add the internal definition variables to the end
+                          (reg argl)
+                          (reg env)))))
      (compile-sequence new-body 'val 'return (extend-compile-time-environment formals compile-time-env)))))
 
 (define (remove-internal-definitions body)
@@ -559,9 +598,14 @@
 
 '(COMPILER LOADED)
 
+(define (println . args)
+  (newline)
+  (define (init a)
+    (if (null? a)
+      'done
+      (begin (display (car a)) (display " ") (init (cdr a)))))
+  (init args))
+
 (newline)
-(display (compile '((lambda (x y)
-                      (define s 1)
-                      (* 1 2))
-                    3
-                    4) 'val 'next the-empty-compile-time-env))
+(display (compile '(lambda (+ * a b x y)
+                     (+ (* a x) (* b y))) 'val 'next the-empty-compile-time-env))
