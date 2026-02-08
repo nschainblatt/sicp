@@ -15,7 +15,7 @@
 (load "ch5-syntax.scm")			;section 4.1.2 syntax procedures
 (load "ch5-eceval-support.scm")
 
-(define UNASSIGNED '*unassigned)
+(define UNASSIGNED '*unassigned*)
 
 (define (find-variable var compile-time-env)
   (define (env-iter env-index env)
@@ -262,18 +262,34 @@
        after-lambda))))
 
 (define (compile-lambda-body exp proc-entry compile-time-env)
-  (let ((formals (lambda-parameters exp))) 
+  (let* ((body-internal-definition-pair (remove-internal-definitions (lambda-body exp)))
+         (new-body (car body-internal-definition-pair)) ;; with internal definitions removed
+         (internal-definition-variables (cdr body-internal-definition-pair))
+         (formals (append (lambda-parameters exp) internal-definition-variables)))
     (append-instruction-sequences
-     (make-instruction-sequence '(env proc argl) '(env)
+     (make-instruction-sequence '(env proc argl) '(env argl)
       `(,proc-entry
         (assign env (op compiled-procedure-env) (reg proc))
+        (assign argl (op append) (reg argl) (const ,(map (lambda (def) UNASSIGNED) internal-definition-variables))) ;; ensure the vars are unassigned, to be set! by the new-body.
         (assign env
                 (op extend-environment)
-                (const ,formals)
+                (const ,formals) ;; add the internal definition variables to the end
                 (reg argl)
                 (reg env))))
-     (compile-sequence (lambda-body exp) 'val 'return (extend-compile-time-environment formals compile-time-env)))))
+     (compile-sequence new-body 'val 'return (extend-compile-time-environment formals compile-time-env)))))
 
+(define (remove-internal-definitions body)
+  (define (iter old-body new-body assignments vars)
+    (if (null? old-body)
+      (cons (append assignments new-body) vars)
+      (let ((exp (car old-body)))
+        (if (definition? exp)
+          (iter (cdr old-body) new-body (append assignments (list (make-assignment (definition-variable exp) (definition-value exp)))) (append vars (list (definition-variable exp))))
+          (iter (cdr old-body) (append new-body (list exp)) assignments vars)))))
+  (iter body '() '() '()))
+
+(define (make-assignment var value)
+  (list 'set! var value))
 
 ;;;SECTION 5.5.3
 
@@ -461,9 +477,7 @@
 
 (newline)
 (display (compile '((lambda (x y)
-                      (lambda (a b c d e)
-                        ((lambda (y z) (* s y z))
-                         (* a b x)
-                         (+ c d x))))
+                      (define s 1)
+                      (* 1 2))
                     3
                     4) 'val 'next the-empty-compile-time-env))
