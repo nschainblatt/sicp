@@ -1,0 +1,567 @@
+;;;;COMPILER FROM SECTION 5.5 OF
+;;;; STRUCTURE AND INTERPRETATION OF COMPUTER PROGRAMS
+
+;;;;Matches code in ch5.scm
+
+;;;;This file can be loaded into Scheme as a whole.
+;;;;**NOTE**This file loads the metacircular evaluator's syntax procedures
+;;;;  from section 4.1.2
+;;;;  You may need to change the (load ...) expression to work in your
+;;;;  version of Scheme.
+
+;;;;Then you can compile Scheme programs as shown in section 5.5.5
+
+;;**implementation-dependent loading of syntax procedures
+(load "ch5-syntax.scm")			;section 4.1.2 syntax procedures
+(load "ch5-eceval-support.scm")
+
+;; Code generators
+
+;; Allows any number of operands
+(define (adder-generator exp target linkage compile-time-env)
+  (let ((operand-codes (spread-operands (adder-operands exp) compile-time-env)))
+    (if (null? operand-codes)
+      (end-with-linkage linkage
+                        (make-instruction-sequence '() '(val) '((assign val (const 0)))))
+      (code-generator '+ operand-codes target linkage))))
+
+;; Expects only two operands
+(define (equals-generator exp target linkage compile-time-env)
+  (let ((operand-codes (spread-operands (equal-operands exp) compile-time-env)))
+    (cond ((null? operand-codes) (end-with-linkage linkage (make-instruction-sequence '() '(val) '((assign val (const #t))))))
+          ((not (= (length operand-codes) 2)) (error "Integer equal (=) must have 0 or two operands"))
+          (else (code-generator '= operand-codes target linkage)))))
+
+
+;; Allows any number of operands
+(define (multiplier-generator exp target linkage compile-time-env)
+  (let ((operand-codes (spread-operands (multiplier-operands exp) compile-time-env)))
+    (if (null? operand-codes)
+      (end-with-linkage linkage
+                        (make-instruction-sequence '() '(val) '((assign val (const 1)))))
+      (code-generator '* operand-codes target linkage))))
+
+;; Allows any number of operands
+(define (subtraction-generator exp target linkage compile-time-env)
+  (let ((operand-codes (spread-operands (subtraction-operands exp) compile-time-env)))
+    (if (null? operand-codes)
+      (error "Subtraction (-) must have at least 1 operand")
+      (code-generator '- operand-codes target linkage))))
+
+;; Uses val as the accumulator register
+(define (spread-operands operands compile-time-env)
+  (if (null? operands)
+    '()
+    (cons (compile (car operands) 'val 'next compile-time-env)
+          (map (lambda (operand) (compile operand 'arg1 'next compile-time-env)) (cdr operands)))))
+
+(define (code-generator operator operand-codes target linkage)
+  (if (eq? target 'val) ;; the result will already be in val, so no need to assign to target.
+    (end-with-linkage linkage
+                      (operate-operand-codes operator (cdr operand-codes) (car operand-codes)))
+    (end-with-linkage linkage (append-instruction-sequences
+                                (operate-operand-codes operator (cdr operand-codes) (car operand-codes))
+                                (make-instruction-sequence '() '() `((assign ,target (reg val))))))))
+
+(define (operate-operand-codes operator op-codes result)
+    (if (null? op-codes)
+      result
+      (operate-operand-codes operator (cdr op-codes)
+                           (append-instruction-sequences
+                             result
+                             (preserving '(val env)
+                                         (car op-codes)
+                                         (make-instruction-sequence '(val arg1) '(val) `((assign val (op ,operator) (reg val) (reg arg1)))))))))
+
+;; Predicates and selectors for primitive code generators
+
+(define (adder? exp)
+  (tagged-list? exp '+))
+(define (adder-operands exp)
+  (cdr exp))
+
+(define (integer-equal? exp)
+  (tagged-list? exp '=))
+(define (equal-operands exp)
+  (cdr exp))
+
+(define (multiplier? exp)
+  (tagged-list? exp '*))
+(define (multiplier-operands exp)
+  (cdr exp))
+
+(define (subtraction? exp)
+  (tagged-list? exp '-))
+(define (subtraction-operands exp)
+  (cdr exp))
+
+(define UNASSIGNED '*unassigned*)
+
+(define (find-variable var compile-time-env)
+  (define (env-iter env-index env)
+    (if (null? env)
+      'not-found
+      (let ((frame-index (frame-iter 0 (first-frame env))))
+        (if frame-index
+          (make-lexical-address env-index frame-index)
+          (env-iter (+ env-index 1) (enclosing-environment env))))))
+  (define (frame-iter index vars)
+    (cond ((null? vars) #f)
+          ((eq? var (car vars)) index)
+          (else (frame-iter (+ index 1) (cdr vars)))))
+  (env-iter 0 compile-time-env))
+
+(define (lexical-address-lookup lexical-address env)
+  (let ((value (car (frame-scan (lexical-address-displacement-number lexical-address)
+                           (env-scan (lexical-address-frame-number lexical-address)
+                                     env)))))
+    (if (eq? value UNASSIGNED)
+      (error "Error: accessing a variable whose value is unassigned LEXICAL-ADDRESS-LOOKUP")
+      value)))
+
+(define (lexical-address-set! lexical-address env value)
+  (let ((value-pair (frame-scan (lexical-address-displacement-number lexical-address)
+                                (env-scan (lexical-address-frame-number lexical-address)
+                                          env))))
+    (set-car! value-pair value)))
+
+;; Returns the frame located frame-number frames from env.
+(define (env-scan frame-number env)
+  (define (iter index curr)
+    (if (= index 0)
+      (first-frame curr)
+      (iter (- index 1) (enclosing-environment curr))))
+  (if (> frame-number (number-of-environments env))
+    (error "Error: frame-number cannot be larger than the number of frames ENV-SCAN")
+    (iter frame-number env)))
+
+;; Returns a pair containing the value of the variable at the displacement-number.
+;; Returning a pair to allow set! operations to be performed and modify the enclosing environment.
+(define (frame-scan displacement-number frame)
+  (define (iter index vals)
+    (if (= index 0)
+      vals
+      (iter (- index 1) (cdr vals))))
+  (if (> displacement-number (number-of-bindings frame))
+    (error "Error: displacement-number cannot be larger than the number of bindings in the frame FRAME-SCAN")
+    (iter displacement-number (frame-values frame))))
+
+(define (make-lexical-address frame-number displacement-number)
+  (cons frame-number displacement-number))
+(define (lexical-address-frame-number lexical-address)
+  (car lexical-address))
+(define (lexical-address-displacement-number lexical-address)
+  (cdr lexical-address))
+
+;; Compile time environment
+(define the-empty-compile-time-env '())
+(define (extend-compile-time-environment vars env)
+  (cons vars env))
+
+;;;SECTION 5.5.1
+
+(define (compile exp target linkage compile-time-env)
+  (cond ((self-evaluating? exp)
+         (compile-self-evaluating exp target linkage))
+        ((quoted? exp) (compile-quoted exp target linkage))
+        ((variable? exp)
+         (compile-variable exp target linkage compile-time-env))
+        ((assignment? exp)
+         (compile-assignment exp target linkage compile-time-env))
+        ((definition? exp)
+         (compile-definition exp target linkage compile-time-env))
+        ((if? exp) (compile-if exp target linkage compile-time-env))
+        ((lambda? exp) (compile-lambda exp target linkage compile-time-env))
+        ((begin? exp)
+         (compile-sequence (begin-actions exp)
+                           target
+                           linkage
+                           compile-time-env))
+        ((cond? exp) (compile (cond->if exp) target linkage))
+        ((adder? exp) (adder-generator exp target linkage compile-time-env))
+        ((subtraction? exp) (subtraction-generator exp target linkage compile-time-env))
+        ((multiplier? exp) (multiplier-generator exp target linkage compile-time-env))
+        ((integer-equal? exp) (equals-generator exp target linkage compile-time-env))
+        ((application? exp)
+         (compile-application exp target linkage compile-time-env))
+        (else
+         (error "Unknown expression type -- COMPILE" exp))))
+
+
+(define (make-instruction-sequence needs modifies statements)
+  (list needs modifies statements))
+
+(define (empty-instruction-sequence)
+  (make-instruction-sequence '() '() '()))
+
+
+;;;SECTION 5.5.2
+
+;;;linkage code
+
+(define (compile-linkage linkage)
+  (cond ((eq? linkage 'return)
+         (make-instruction-sequence '(continue) '()
+          '((goto (reg continue)))))
+        ((eq? linkage 'next)
+         (empty-instruction-sequence))
+        (else
+         (make-instruction-sequence '() '()
+          `((goto (label ,linkage)))))))
+
+(define (end-with-linkage linkage instruction-sequence)
+  (preserving '(continue)
+   instruction-sequence
+   (compile-linkage linkage)))
+
+
+;;;simple expressions
+
+(define (compile-self-evaluating exp target linkage)
+  (end-with-linkage linkage
+   (make-instruction-sequence '() (list target)
+    `((assign ,target (const ,exp))))))
+
+(define (compile-quoted exp target linkage)
+  (end-with-linkage linkage
+   (make-instruction-sequence '() (list target)
+    `((assign ,target (const ,(text-of-quotation exp)))))))
+
+(define (compile-variable exp target linkage compile-time-env)
+  (let ((lexical-address (find-variable exp compile-time-env)))
+    (end-with-linkage linkage
+                      (if (eq? lexical-address 'not-found)
+                        (make-instruction-sequence '() (list target 'env)
+                                                   `((assign env (op get-global-environment))
+                                                     (assign ,target
+                                                             (op lookup-variable-value)
+                                                             (const ,exp)
+                                                             (reg env))))
+                        (make-instruction-sequence '(env) (list target)
+                                                   `((assign ,target
+                                                             (op lexical-address-lookup)
+                                                             (const ,lexical-address)
+                                                             (reg env))))))))
+
+(define (compile-assignment exp target linkage compile-time-env)
+  (let* ((var (assignment-variable exp))
+         (get-value-code (compile (assignment-value exp) 'val 'next compile-time-env))
+         (lexical-address (find-variable var compile-time-env)))
+    (end-with-linkage linkage
+                      (preserving '(env)
+                                  get-value-code
+                                  (if (eq? lexical-address 'not-found)
+                                    (make-instruction-sequence '(val) (list target 'env)
+                                                               `((assign env (op get-global-environment))
+                                                                 (perform (op set-variable-value!)
+                                                                          (const ,var)
+                                                                          (reg val)
+                                                                          (reg env))
+                                                                 (assign ,target (const ok))))
+                                    (make-instruction-sequence '(env val) (list target)
+                                                               `((perform (op lexical-address-set!)
+                                                                          (const ,lexical-address)
+                                                                          (reg val)
+                                                                          (reg env))
+                                                                 (assign ,target (const ok)))))))))
+
+(define (compile-definition exp target linkage compile-time-env)
+  (let ((var (definition-variable exp))
+        (get-value-code
+         (compile (definition-value exp) 'val 'next compile-time-env)))
+    (end-with-linkage linkage
+     (preserving '(env)
+      get-value-code
+      (make-instruction-sequence '(env val) (list target)
+       `((perform (op define-variable!)
+                  (const ,var)
+                  (reg val)
+                  (reg env))
+         (assign ,target (const ok))))))))
+
+
+;;;conditional expressions
+
+;;;labels (from footnote)
+(define label-counter 0)
+
+(define (new-label-number)
+  (set! label-counter (+ 1 label-counter))
+  label-counter)
+
+(define (make-label name)
+  (string->symbol
+    (string-append (symbol->string name)
+                   (number->string (new-label-number)))))
+;; end of footnote
+
+(define (compile-if exp target linkage compile-time-env)
+  (let ((t-branch (make-label 'true-branch))
+        (f-branch (make-label 'false-branch))                    
+        (after-if (make-label 'after-if)))
+    (let ((consequent-linkage
+           (if (eq? linkage 'next) after-if linkage)))
+      (let ((p-code (compile (if-predicate exp) 'val 'next compile-time-env))
+            (c-code
+             (compile
+              (if-consequent exp) target consequent-linkage compile-time-env))
+            (a-code
+             (compile (if-alternative exp) target linkage compile-time-env)))
+        (preserving '(env continue)
+         p-code
+         (append-instruction-sequences
+          (make-instruction-sequence '(val) '()
+           `((test (op false?) (reg val))
+             (branch (label ,f-branch))))
+          (parallel-instruction-sequences
+           (append-instruction-sequences t-branch c-code)
+           (append-instruction-sequences f-branch a-code))
+          after-if))))))
+
+;;; sequences
+
+(define (compile-sequence seq target linkage compile-time-env)
+  (if (last-exp? seq)
+      (compile (first-exp seq) target linkage compile-time-env)
+      (preserving '(env continue)
+       (compile (first-exp seq) target 'next compile-time-env)
+       (compile-sequence (rest-exps seq) target linkage compile-time-env))))
+
+;;;lambda expressions
+
+(define (compile-lambda exp target linkage compile-time-env)
+  (let ((proc-entry (make-label 'entry))
+        (after-lambda (make-label 'after-lambda)))
+    (let ((lambda-linkage
+           (if (eq? linkage 'next) after-lambda linkage)))
+      (append-instruction-sequences
+       (tack-on-instruction-sequence
+        (end-with-linkage lambda-linkage
+         (make-instruction-sequence '(env) (list target)
+          `((assign ,target
+                    (op make-compiled-procedure)
+                    (label ,proc-entry)
+                    (reg env)))))
+        (compile-lambda-body exp proc-entry compile-time-env))
+       after-lambda))))
+
+(define (compile-lambda-body exp proc-entry compile-time-env)
+  (let* ((body-internal-definition-pair (remove-internal-definitions (lambda-body exp)))
+         (new-body (car body-internal-definition-pair)) ;; with internal definitions removed
+         (internal-definition-variables (cdr body-internal-definition-pair))
+         (formals (append (lambda-parameters exp) internal-definition-variables)))
+    (append-instruction-sequences
+     (make-instruction-sequence '(env proc argl) '(env argl)
+      `(,proc-entry
+        (assign env (op compiled-procedure-env) (reg proc))
+        (assign argl (op append) (reg argl) (const ,(map (lambda (def) UNASSIGNED) internal-definition-variables))) ;; ensure the vars are unassigned, to be set! by the new-body.
+        (assign env
+                (op extend-environment)
+                (const ,formals) ;; add the internal definition variables to the end
+                (reg argl)
+                (reg env))))
+     (compile-sequence new-body 'val 'return (extend-compile-time-environment formals compile-time-env)))))
+
+(define (remove-internal-definitions body)
+  (define (iter old-body new-body assignments vars)
+    (if (null? old-body)
+      (cons (append assignments new-body) vars)
+      (let ((exp (car old-body)))
+        (if (definition? exp)
+          (iter (cdr old-body) new-body (append assignments (list (make-assignment (definition-variable exp) (definition-value exp)))) (append vars (list (definition-variable exp))))
+          (iter (cdr old-body) (append new-body (list exp)) assignments vars)))))
+  (iter body '() '() '()))
+
+(define (make-assignment var value)
+  (list 'set! var value))
+
+;;;SECTION 5.5.3
+
+;;;combinations
+
+(define (compile-application exp target linkage compile-time-env)
+  (let ((proc-code (compile (operator exp) 'proc 'next compile-time-env))
+        (operand-codes
+         (map (lambda (operand) (compile operand 'val 'next compile-time-env))
+              (operands exp))))
+    (preserving '(env continue)
+     proc-code
+     (preserving '(proc continue)
+      (construct-arglist operand-codes)
+      (compile-procedure-call target linkage)))))
+
+(define (construct-arglist operand-codes)
+  (let ((operand-codes (reverse operand-codes)))
+    (if (null? operand-codes)
+        (make-instruction-sequence '() '(argl)
+         '((assign argl (const ()))))
+        (let ((code-to-get-last-arg
+               (append-instruction-sequences
+                (car operand-codes)
+                (make-instruction-sequence '(val) '(argl)
+                 '((assign argl (op list) (reg val)))))))
+          (if (null? (cdr operand-codes))
+              code-to-get-last-arg
+              (preserving '(env)
+               code-to-get-last-arg
+               (code-to-get-rest-args
+                (cdr operand-codes))))))))
+
+(define (code-to-get-rest-args operand-codes)
+  (let ((code-for-next-arg
+         (preserving '(argl)
+          (car operand-codes)
+          (make-instruction-sequence '(val argl) '(argl)
+           '((assign argl
+              (op cons) (reg val) (reg argl)))))))
+    (if (null? (cdr operand-codes))
+        code-for-next-arg
+        (preserving '(env)
+         code-for-next-arg
+         (code-to-get-rest-args (cdr operand-codes))))))
+
+;;;applying procedures
+
+(define (compile-procedure-call target linkage)
+  (let ((primitive-branch (make-label 'primitive-branch))
+        (compiled-branch (make-label 'compiled-branch))
+        (after-call (make-label 'after-call)))
+    (let ((compiled-linkage
+           (if (eq? linkage 'next) after-call linkage)))
+      (append-instruction-sequences
+       (make-instruction-sequence '(proc) '()
+        `((test (op primitive-procedure?) (reg proc))
+          (branch (label ,primitive-branch))))
+       (parallel-instruction-sequences
+        (append-instruction-sequences
+         compiled-branch
+         (compile-proc-appl target compiled-linkage))
+        (append-instruction-sequences
+         primitive-branch
+         (end-with-linkage linkage
+          (make-instruction-sequence '(proc argl)
+                                     (list target)
+           `((assign ,target
+                     (op apply-primitive-procedure)
+                     (reg proc)
+                     (reg argl)))))))
+       after-call))))
+
+;;;applying compiled procedures
+
+(define (compile-proc-appl target linkage)
+  (cond ((and (eq? target 'val) (not (eq? linkage 'return)))
+         (make-instruction-sequence '(proc) all-regs
+           `((assign continue (label ,linkage))
+             (assign val (op compiled-procedure-entry)
+                         (reg proc))
+             (goto (reg val)))))
+        ((and (not (eq? target 'val))
+              (not (eq? linkage 'return)))
+         (let ((proc-return (make-label 'proc-return)))
+           (make-instruction-sequence '(proc) all-regs
+            `((assign continue (label ,proc-return))
+              (assign val (op compiled-procedure-entry)
+                          (reg proc))
+              (goto (reg val))
+              ,proc-return
+              (assign ,target (reg val))
+              (goto (label ,linkage))))))
+        ((and (eq? target 'val) (eq? linkage 'return))
+         (make-instruction-sequence '(proc continue) all-regs
+          '((assign val (op compiled-procedure-entry)
+                        (reg proc))
+            (goto (reg val)))))
+        ((and (not (eq? target 'val)) (eq? linkage 'return))
+         (error "return linkage, target not val -- COMPILE"
+                target))))
+
+;; footnote
+(define all-regs '(env proc val argl continue))
+
+
+;;;SECTION 5.5.4
+
+(define (registers-needed s)
+  (if (symbol? s) '() (car s)))
+
+(define (registers-modified s)
+  (if (symbol? s) '() (cadr s)))
+
+(define (statements s)
+  (if (symbol? s) (list s) (caddr s)))
+
+(define (needs-register? seq reg)
+  (memq reg (registers-needed seq)))
+
+(define (modifies-register? seq reg)
+  (memq reg (registers-modified seq)))
+
+
+(define (append-instruction-sequences . seqs)
+  (define (append-2-sequences seq1 seq2)
+    (make-instruction-sequence
+     (list-union (registers-needed seq1)
+                 (list-difference (registers-needed seq2)
+                                  (registers-modified seq1)))
+     (list-union (registers-modified seq1)
+                 (registers-modified seq2))
+     (append (statements seq1) (statements seq2))))
+  (define (append-seq-list seqs)
+    (if (null? seqs)
+        (empty-instruction-sequence)
+        (append-2-sequences (car seqs)
+                            (append-seq-list (cdr seqs)))))
+  (append-seq-list seqs))
+
+(define (list-union s1 s2)
+  (cond ((null? s1) s2)
+        ((memq (car s1) s2) (list-union (cdr s1) s2))
+        (else (cons (car s1) (list-union (cdr s1) s2)))))
+
+(define (list-difference s1 s2)
+  (cond ((null? s1) '())
+        ((memq (car s1) s2) (list-difference (cdr s1) s2))
+        (else (cons (car s1)
+                    (list-difference (cdr s1) s2)))))
+
+(define (preserving regs seq1 seq2)
+  (if (null? regs)
+      (append-instruction-sequences seq1 seq2)
+      (let ((first-reg (car regs)))
+        (if (and (needs-register? seq2 first-reg)
+                 (modifies-register? seq1 first-reg))
+            (preserving (cdr regs)
+             (make-instruction-sequence
+              (list-union (list first-reg)
+                          (registers-needed seq1))
+              (list-difference (registers-modified seq1)
+                               (list first-reg))
+              (append `((save ,first-reg))
+                      (statements seq1)
+                      `((restore ,first-reg))))
+             seq2)
+            (preserving (cdr regs) seq1 seq2)))))
+
+(define (tack-on-instruction-sequence seq body-seq)
+  (make-instruction-sequence
+   (registers-needed seq)
+   (registers-modified seq)
+   (append (statements seq) (statements body-seq))))
+
+(define (parallel-instruction-sequences seq1 seq2)
+  (make-instruction-sequence
+   (list-union (registers-needed seq1)
+               (registers-needed seq2))
+   (list-union (registers-modified seq1)
+               (registers-modified seq2))
+   (append (statements seq1) (statements seq2))))
+
+'(COMPILER LOADED)
+
+(newline)
+(display (compile '((lambda (x y)
+                      (define s 1)
+                      (* 1 2))
+                    3
+                    4) 'val 'next the-empty-compile-time-env))
