@@ -154,18 +154,25 @@
 
 (define (compile-assignment exp target linkage compile-time-env)
   (let* ((var (assignment-variable exp))
-        (get-value-code
-         (compile (assignment-value exp) 'val 'next compile-time-env))
-        (lexical-address (find-variable var compile-time-env)))
+         (get-value-code (compile (assignment-value exp) 'val 'next compile-time-env))
+         (lexical-address (find-variable var compile-time-env)))
     (end-with-linkage linkage
-     (preserving '(env)
-      get-value-code
-      (make-instruction-sequence '(env val) (list target)
-       `((perform (op lexical-address-set!)
-                  (const ,lexical-address)
-                  (reg val)
-                  (reg env))
-         (assign ,target (const ok))))))))
+                      (preserving '(env)
+                                  get-value-code
+                                  (if (eq? lexical-address 'not-found)
+                                    (make-instruction-sequence '(val) (list target 'env)
+                                                               `((assign env (op get-global-environment))
+                                                                 (perform (op set-variable-value!)
+                                                                          (const ,var)
+                                                                          (reg val)
+                                                                          (reg env))
+                                                                 (assign ,target (const ok))))
+                                    (make-instruction-sequence '(env val) (list target)
+                                                               `((perform (op lexical-address-set!)
+                                                                          (const ,lexical-address)
+                                                                          (reg val)
+                                                                          (reg env))
+                                                                 (assign ,target (const ok)))))))))
 
 (define (compile-definition exp target linkage compile-time-env)
   (let ((var (definition-variable exp))
@@ -448,7 +455,7 @@
 (newline)
 (display (compile '((lambda (x y)
                       (lambda (a b c d e)
-                        ((lambda (y z) (set! z x))
+                        ((lambda (y z) (set! s x))
                          (* a b x)
                          (+ c d x))))
                     3
