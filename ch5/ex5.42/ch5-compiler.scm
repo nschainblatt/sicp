@@ -146,11 +146,18 @@
 (define (compile-variable exp target linkage compile-time-env)
   (let ((lexical-address (find-variable exp compile-time-env)))
     (end-with-linkage linkage
-     (make-instruction-sequence '(env) (list target)
-      `((assign ,target
-                (op lexical-address-lookup)
-                (const ,lexical-address)
-                (reg env)))))))
+                      (if (eq? lexical-address 'not-found)
+                        (make-instruction-sequence '() (list target 'env)
+                                                   `((assign env (op get-global-environment))
+                                                     (assign ,target
+                                                             (op lookup-variable-value)
+                                                             (const ,exp)
+                                                             (reg env))))
+                        (make-instruction-sequence '(env) (list target)
+                                                   `((assign ,target
+                                                             (op lexical-address-lookup)
+                                                             (const ,lexical-address)
+                                                             (reg env))))))))
 
 (define (compile-assignment exp target linkage compile-time-env)
   (let* ((var (assignment-variable exp))
@@ -455,7 +462,7 @@
 (newline)
 (display (compile '((lambda (x y)
                       (lambda (a b c d e)
-                        ((lambda (y z) (set! s x))
+                        ((lambda (y z) (* s y z))
                          (* a b x)
                          (+ c d x))))
                     3
