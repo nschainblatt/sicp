@@ -20,3 +20,9 @@
 					;and interface to compiled code
 
 (load "ch5-compiler")
+
+(compile-and-go '(define (f x) (g x)))
+;; Then define g in the driver loop:
+;; (define (g x)
+;;   (* x 3))
+;; Then call (f 3), the result will be 9 as it will call the interpreted procedure g.
