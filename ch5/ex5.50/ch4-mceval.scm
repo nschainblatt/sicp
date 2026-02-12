@@ -287,10 +287,12 @@
 ;;;SECTION 4.1.4
 
 (define (setup-environment)
+  (display "setting up initial env\n")
   (let ((initial-env
          (extend-environment (primitive-procedure-names)
                              (primitive-procedure-objects)
                              the-empty-environment)))
+    (display "finished setting up initial env\n")
     (define-variable! 'true true initial-env)
     (define-variable! 'false false initial-env)
     initial-env))
@@ -353,7 +355,7 @@
 
 ;;;Following are commented out so as not to be evaluated when
 ;;; the file is loaded.
-;;(define the-global-environment (setup-environment))
-;;(driver-loop)
+(define the-global-environment (get-global-environment))
+(driver-loop)
 
 'METACIRCULAR-EVALUATOR-LOADED)

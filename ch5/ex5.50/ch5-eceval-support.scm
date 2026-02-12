@@ -97,6 +97,54 @@
 
 ;;;SECTION 4.1.4
 
+(define (primitive-procedure-names)
+  (map car
+       primitive-procedures))
+
+(define (primitive-procedure-objects)
+  (map (lambda (proc) (list 'primitive (cadr proc)))
+       primitive-procedures))
+
+(define primitive-procedures
+  (list (list 'car car)
+        (list 'cadr cadr)
+        (list 'caadr caadr)
+        (list 'caddr caddr)
+        (list 'cdadr cdadr)
+        (list 'cddr cddr)
+        (list 'cdddr cdddr)
+        (list 'cadddr cadddr)
+        (list 'set-car! set-car!)
+        (list 'set-cdr! set-cdr!)
+        (list 'length length)
+        (list 'not not)
+        (list 'cdr cdr)
+        (list 'cons cons)
+        (list 'null? null?)
+	;;above from book -- here are some more
+	(list '+ +)
+	(list '- -)
+	(list '* *)
+	(list '= =)
+	(list '/ /)
+	(list '> >)
+	(list '< <)
+        (list 'apply apply)
+        (list 'list list)
+        (list 'error error)
+        (list 'number? number?)
+        (list 'string? string?)
+        (list 'pair? pair?)
+        (list 'eq? eq?)
+        (list 'symbol? symbol?)
+        (list 'display display)
+        (list 'newline newline)
+        (list 'map map)
+        (list 'get-global-environment (lambda () (get-global-environment)))
+        (list 'read read)
+
+        ))
+
 (define (setup-environment)
   (let ((initial-env
          (extend-environment (primitive-procedure-names)
@@ -111,28 +159,11 @@
 
 (define (primitive-implementation proc) (cadr proc))
 
-(define primitive-procedures
-  (list (list 'car car)
-        (list 'cdr cdr)
-        (list 'cons cons)
-        (list 'null? null?)
-	;;above from book -- here are some more
-	(list '+ +)
-	(list '- -)
-	(list '* *)
-	(list '= =)
-	(list '/ /)
-	(list '> >)
-	(list '< <)
-        ))
+;;; From section 5.4.4 footnote
+(define the-global-environment (setup-environment))
+(define (get-global-environment)
+  the-global-environment)
 
-(define (primitive-procedure-names)
-  (map car
-       primitive-procedures))
-
-(define (primitive-procedure-objects)
-  (map (lambda (proc) (list 'primitive (cadr proc)))
-       primitive-procedures))
 
 (define apply-in-underlying-scheme apply)
 
@@ -167,13 +198,6 @@
 
 ;;; From section 5.4.2 footnote, for non-tail-recursive sequences
 (define (no-more-exps? seq) (null? seq))
-
-;;; From section 5.4.4 footnote
-(define (get-global-environment)
-  the-global-environment)
-;; will do following when ready to run, not when load this file
-;;(define the-global-environment (setup-environment))
-
 
 ;;; Simulation of new machine operations needed for compiled code
 ;;;  and eceval/compiler interface (not used by plain eceval machine)

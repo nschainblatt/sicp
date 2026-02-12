@@ -28,6 +28,7 @@
         ((definition? exp)
          (compile-definition exp target linkage))
         ((if? exp) (compile-if exp target linkage))
+        ((let? exp) (compile (let->combination exp) target linkage))
         ((lambda? exp) (compile-lambda exp target linkage))
         ((begin? exp)
          (compile-sequence (begin-actions exp)
@@ -38,6 +39,22 @@
          (compile-application exp target linkage))
         (else
          (error "Unknown expression type -- COMPILE" exp))))
+
+(define (let? exp) (tagged-list? exp 'let))
+(define (let-bindings exp) (cadr exp))
+(define (let-body exp) (cddr exp))
+
+(define (let-var binding) (car binding))
+(define (let-val binding) (cadr binding))
+
+(define (make-combination operator operands) (cons operator operands))
+
+(define (let->combination exp)
+  ;;make-combination defined in earlier exercise
+  (let ((bindings (let-bindings exp)))
+    (make-combination (make-lambda (map let-var bindings)
+                                   (let-body exp))
+                      (map let-val bindings))))
 
 
 (define (make-instruction-sequence needs modifies statements)
