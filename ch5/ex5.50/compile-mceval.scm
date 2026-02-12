@@ -1,0 +1,26 @@
+(load "ch5-regsim")
+(load "ch5-eceval-support")
+(load "ch5-eceval-compiler")
+(load "ch5-compiler.scm")
+
+(define (main port)
+  (let* ((instructions (statements (compile (read port) 'val 'return)))
+         (mceval (make-machine '(val env proc argl continue)
+                               (list
+                                 (list 'lookup-variable-value lookup-variable-value)
+                                 (list 'define-variable! define-variable!)
+                                 (list 'make-compiled-procedure make-compiled-procedure)
+                                 (list 'compiled-procedure-env compiled-procedure-env)
+                                 (list 'extend-environment extend-environment)
+                                 (list 'list list)
+                                 (list 'primitive-procedure? primitive-procedure?)
+                                 (list 'compiled-procedure-entry compiled-procedure-entry)
+                                 (list 'apply-primitive-procedure  apply-primitive-procedure)
+                                 (list 'false? false?)
+                                 (list 'cons cons)
+                               )
+                               instructions)))
+
+    (start mceval)))
+
+(call-with-input-file "ch4-mceval.scm" main)
