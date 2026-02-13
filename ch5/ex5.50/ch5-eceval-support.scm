@@ -105,6 +105,13 @@
   (map (lambda (proc) (list 'primitive (cadr proc)))
        primitive-procedures))
 
+(define (println . args)
+  (define (iter rest)
+    (if (null? rest)
+      (newline)
+      (begin (display (car rest)) (display " ") (iter (cdr rest)))))
+  (iter args))
+
 (define primitive-procedures
   (list (list 'car car)
         (list 'cadr cadr)
@@ -114,12 +121,14 @@
         (list 'cddr cddr)
         (list 'cdddr cdddr)
         (list 'cadddr cadddr)
+        (list 'cadadr cadadr)
         (list 'set-car! set-car!)
         (list 'set-cdr! set-cdr!)
         (list 'length length)
         (list 'not not)
         (list 'cdr cdr)
         (list 'cons cons)
+        (list 'append append)
         (list 'null? null?)
 	;;above from book -- here are some more
 	(list '+ +)
@@ -139,9 +148,9 @@
         (list 'symbol? symbol?)
         (list 'display display)
         (list 'newline newline)
-        (list 'map map)
         (list 'get-global-environment (lambda () (get-global-environment)))
         (list 'read read)
+        (list 'println println)
 
         ))
 
@@ -209,3 +218,7 @@
 (define (compiled-procedure-entry c-proc) (cadr c-proc))
 (define (compiled-procedure-env c-proc) (caddr c-proc))
 
+; (define (fib n)
+;   (if (< n 2)
+;     n
+;     (+ (fib (- n 1)) (fib (- n 2)))))

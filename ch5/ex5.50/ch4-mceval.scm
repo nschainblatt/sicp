@@ -29,6 +29,7 @@
          (make-procedure (lambda-parameters exp)
                          (lambda-body exp)
                          env))
+        ((let? exp) (eval (let->combination exp) env))
         ((begin? exp) 
          (eval-sequence (begin-actions exp) env))
         ((cond? exp) (eval (cond->if exp) env))
@@ -51,6 +52,23 @@
         (else
          (error
           "Unknown procedure type -- APPLY" procedure))))
+
+(define (let? exp) (tagged-list? exp 'let))
+(define (let-bindings exp) (cadr exp))
+(define (let-body exp) (cddr exp))
+
+(define (let-var binding) (car binding))
+(define (let-val binding) (cadr binding))
+
+(define (make-combination operator operands) (cons operator operands))
+
+(define (let->combination exp)
+  ;;make-combination defined in earlier exercise
+  (let ((bindings (let-bindings exp)))
+    (make-combination (make-lambda (map let-var bindings)
+                                   (let-body exp))
+                      (map let-val bindings))))
+
 
 
 (define (list-of-values exps env)
@@ -287,12 +305,10 @@
 ;;;SECTION 4.1.4
 
 (define (setup-environment)
-  (display "setting up initial env\n")
   (let ((initial-env
          (extend-environment (primitive-procedure-names)
                              (primitive-procedure-objects)
                              the-empty-environment)))
-    (display "finished setting up initial env\n")
     (define-variable! 'true true initial-env)
     (define-variable! 'false false initial-env)
     initial-env))
@@ -309,6 +325,9 @@
         (list 'cdr cdr)
         (list 'cons cons)
         (list 'null? null?)
+        (list '+ +)
+        (list '< <)
+        (list '- -)
 ;;      more primitives
         ))
 
@@ -317,7 +336,12 @@
        primitive-procedures))
 
 (define (primitive-procedure-objects)
-  (map (lambda (proc) (list 'primitive (cadr proc)))
+  ;; NOTE: we have to cadadr here instead of cadr like we were previously
+  ;; because if we don't the primitives that exist in the compiler environment
+  ;; would get double wrapped like:
+  ;; (primitive (primitive #[procedure]))
+  ;; When we need (primitive #[procedure])
+  (map (lambda (proc) (list 'primitive (cadadr proc)))
        primitive-procedures))
 
 ;[moved to start of file] (define apply-in-underlying-scheme apply)
@@ -353,9 +377,7 @@
                      '<procedure-env>))
       (display object)))
 
-;;;Following are commented out so as not to be evaluated when
-;;; the file is loaded.
-(define the-global-environment (get-global-environment))
+(define the-global-environment (setup-environment))
 (driver-loop)
 
 'METACIRCULAR-EVALUATOR-LOADED)

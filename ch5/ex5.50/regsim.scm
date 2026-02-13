@@ -1,87 +1,78 @@
-;; This is the regmachine module from exercise 5.19 which added debugging.
+;;;;REGISTER-MACHINE SIMULATOR FROM SECTION 5.2 OF
+;;;; STRUCTURE AND INTERPRETATION OF COMPUTER PROGRAMS
 
-(define (distinct seq)
-  (define (iter rest result)
-    (cond ((null? rest) result)
-	  ((member (car rest) result) (iter (cdr rest) result))
-	  (else (iter (cdr rest) (cons (car rest) result)))))
-  (iter seq '()))
+;;;;Matches code in ch5.scm
 
-(define (my-sort seq fkey)
-  (define (sort-iter rest result)
-    (cond ((null? rest) result)
-	  ((null? result) (sort-iter (cdr rest) (cons (car rest) result)))
-	  (else (let ((instr-type (fkey (car rest)))
-		      (curr-smallest-instr-type (fkey (car result))))
-		  (if (symbol<=? instr-type curr-smallest-instr-type)
-		    (sort-iter (cdr rest) (cons (car rest) result))
-		    (sort-iter (cdr rest) (insert-instr-in-order (car rest) result)))))))
-  (define (insert-instr-in-order instr seq)
-    (let ((instr-type (fkey instr)))
-      (define (insert-iter rest result)
-	(if (null? rest)
-	  (append result (list instr))
-	  (let* ((curr-instr (car rest))
-		 (curr-instr-type (fkey curr-instr)))
-	    (if (symbol<=? instr-type curr-instr-type)
-	      (append result (cons instr rest))
-	      (insert-iter (cdr rest) (append result (list curr-instr)))))))
-      (insert-iter seq '())))
-  (sort-iter seq '()))
+;;;;This file can be loaded into Scheme as a whole.
+;;;;Then you can define and simulate machines as shown in section 5.2
 
-(define (symbol<=? x y)
-  (or (eq? x y) (symbol<? x y)))
+;;;**NB** there are two versions of make-stack below.
+;;; Choose the monitored or unmonitored one by reordering them to put the
+;;;  one you want last, or by commenting one of them out.
+;;; Also, comment in/out the print-stack-statistics op in make-new-machine
+;;; To find this stack code below, look for comments with **
 
-(define (println . args)
-  (let* ((has-delimiter? (if (and (not (null? args)) (eq? (car args) 'delimiter))
-			   (if (null? (cdr args))
-			     (error "No delimiter supplied --PRINTLN")
-			     #t)
-			   #f))
-	 (delimiter (if has-delimiter? (cadr args) " ")))
-    (newline)
-    (define (iter rest)
-      (if (null? rest)
-	'done
-	(begin (display (car rest)) (display delimiter) (iter (cdr rest)))))
-    (iter (if has-delimiter? (cddr args) args))))
-
-(define (make-machine ops controller-text)
+(define (make-machine register-names ops controller-text)
   (let ((machine (make-new-machine)))
-    ((machine 'install-operations) ops)
-    ((machine 'install-data-path) controller-text)
-    ((machine 'install-instruction-sequence) (assemble controller-text machine))
+    (for-each (lambda (register-name)
+                ((machine 'allocate-register) register-name))
+              register-names)
+    ((machine 'install-operations) ops)    
+    ((machine 'install-instruction-sequence)
+     (assemble controller-text machine))
     machine))
 
 (define (make-register name)
-  (let ((contents '*unassigned*)
-	(tracing-enabled? #f))
-    (define (set-register value)
-      (if tracing-enabled?
-	(begin (println 'delimiter "" "Register assignment: " name ". Old value: " contents ". New value: " value)))
-      (set! contents value))
+  (let ((contents '*unassigned*))
     (define (dispatch message)
-      (cond ((eq? message 'name) name)
-	    ((eq? message 'get) contents)
-	    ((eq? message 'set) set-register)
-	    ((eq? message 'enable-tracing) (set! tracing-enabled? #t))
-	    ((eq? message 'disable-tracing) (set! tracing-enabled? #f))
-	    (else
-	      (error "Unknown request: REGISTER" message))))
+      (cond ((eq? message 'get) contents)
+            ((eq? message 'name) name)
+            ((eq? message 'set)
+             (lambda (value) (set! contents value)))
+            (else
+             (error "Unknown request -- REGISTER" message))))
     dispatch))
 
 (define (get-contents register)
-  (if (eq? (register 'get) '*unassigned*)
-    (println "getting contents of register:" (register 'name) (register 'get)))
   (register 'get))
+
 (define (set-contents! register value)
   ((register 'set) value))
 
+;;**original (unmonitored) version from section 5.2.1
+(define (make-stack)
+  (let ((s '()))
+    (define (push x)
+      (set! s (cons x s)))
+    (define (pop)
+      (if (null? s)
+          (error "Empty stack -- POP")
+          (let ((top (car s)))
+            (set! s (cdr s))
+            top)))
+    (define (initialize)
+      (set! s '())
+      'done)
+    (define (dispatch message)
+      (cond ((eq? message 'push) push)
+            ((eq? message 'pop) (pop))
+            ((eq? message 'initialize) (initialize))
+            (else (error "Unknown request -- STACK"
+                         message))))
+    dispatch))
+
+(define (pop stack)
+  (stack 'pop))
+
+(define (push stack value)
+  ((stack 'push) value))
+
+;;**monitored version from section 5.2.4
 (define (make-stack)
   (let ((s '())
-	(number-pushes 0)
-	(max-depth 0)
-	(current-depth 0))
+        (number-pushes 0)
+        (max-depth 0)
+        (current-depth 0))
     (define (push x)
       (set! s (cons x s))
       (set! number-pushes (+ 1 number-pushes))
@@ -89,11 +80,11 @@
       (set! max-depth (max current-depth max-depth)))
     (define (pop)
       (if (null? s)
-	(error "Empty stack: POP")
-	(let ((top (car s)))
-	  (set! s (cdr s))
-	  (set! current-depth (- current-depth 1))
-	  top)))
+          (error "Empty stack -- POP")
+          (let ((top (car s)))
+            (set! s (cdr s))
+            (set! current-depth (- current-depth 1))
+            top)))    
     (define (initialize)
       (set! s '())
       (set! number-pushes 0)
@@ -102,243 +93,126 @@
       'done)
     (define (print-statistics)
       (newline)
-      (display (list 'total-pushes '= number-pushes
-		     'maximum-depth '= max-depth
-		     'current-depth '= current-depth)))
+      (display (list 'total-pushes  '= number-pushes
+                     'maximum-depth '= max-depth)))
     (define (dispatch message)
       (cond ((eq? message 'push) push)
-	    ((eq? message 'pop) (pop))
-	    ((eq? message 'initialize) (initialize))
-	    ((eq? message 'print-statistics)
-	     (print-statistics))
-	    (else (error "Unknown request: STACK" message))))
+            ((eq? message 'pop) (pop))
+            ((eq? message 'initialize) (initialize))
+            ((eq? message 'print-statistics)
+             (print-statistics))
+            (else
+             (error "Unknown request -- STACK" message))))
     dispatch))
-
-(define (pop stack) (stack 'pop))
-(define (push stack value) ((stack 'push) value))
 
 (define (make-new-machine)
   (let ((pc (make-register 'pc))
-	(flag (make-register 'flag))
-	(stack (make-stack))
-	(the-instruction-sequence '())
-	(labels '())
-	(data-path '())
-	(instruction-execution-counter 0)
-	(tracing-enabled? #f))
-
-    (define (toggle-breakpoint label-name n val)
-      (let* ((insts (lookup-label labels label-name))
-	     (correct-inst (list-ref insts (- n 1))))
-	(set-instruction-breakpoint! correct-inst val)))
-
-    (define (cancel-all-breakpoints)
-      (for-each (lambda (inst) (set-instruction-breakpoint! inst #f)) the-instruction-sequence))
-
-    (define (print-instruction-execution-counter)
-      (newline)
-      (display (list 'instructions-executed '= instruction-execution-counter)))
-    (define (reset-instruction-execution-counter)
-      (set! instruction-execution-counter 0))
+        (flag (make-register 'flag))
+        (stack (make-stack))
+        (the-instruction-sequence '()))
     (let ((the-ops
-	    (list (list 'initialize-stack
-			(lambda () (stack 'initialize)))
-		  (list 'print-stack-statistics
-			(lambda () (stack 'print-statistics)))
-		  (list 'print-instruction-execution-count
-			(lambda () (print-instruction-execution-counter)))
-		  (list 'reset-instruction-execution-counter
-			(lambda () (reset-instruction-execution-counter)))))
-	  (register-table
-	    (list (list 'pc pc) (list 'flag flag))))
+           (list (list 'initialize-stack
+                       (lambda () (stack 'initialize)))
+                 ;;**next for monitored stack (as in section 5.2.4)
+                 ;;  -- comment out if not wanted
+                 (list 'print-stack-statistics
+                       (lambda () (stack 'print-statistics)))))
+          (register-table
+           (list (list 'pc pc) (list 'flag flag))))
       (define (allocate-register name)
-	(if (assoc name register-table)
-	  (error "Multiply defined register: " name)
-	  (let ((new-reg (make-register name)))
-	    (set! register-table (cons (list name new-reg) register-table))
-	    new-reg)))
+        (if (assoc name register-table)
+            (error "Multiply defined register: " name)
+            (set! register-table
+                  (cons (list name (make-register name))
+                        register-table)))
+        'register-allocated)
       (define (lookup-register name)
-	(let ((val (assoc name register-table)))
-	  (if val
-	    (cadr val)
-	    (allocate-register name)))) ;; return the new register object
-
+        (let ((val (assoc name register-table)))
+          (if val
+              (cadr val)
+              (error "Unknown register:" name))))
       (define (execute)
-	(let ((insts (get-contents pc)))
-	  (if (null? insts)
-	    'done
-	    (let ((inst (car insts)))
-	      (if (instruction-breakpoint? inst)
-		(println 'delimiter "" "Breakpoint encountered for the instruction below. Use (proceed-machine ⟨machine⟩) when done to continue execution.\n" inst)
-		(rest-execution inst))))))
-
-      (define (rest-execution inst)
-	(if tracing-enabled? (trace-instruction inst))
-	((instruction-execution-proc inst))
-	(set! instruction-execution-counter (+ instruction-execution-counter 1))
-	(execute))
-
-      (define (trace-instruction inst)
-	(newline)
-	(if (instruction-label inst)
-	  (begin (display "Label: ")
-		 (display (instruction-label inst))
-		 (newline)))
-	(display "Trace: ") (display (instruction-text inst)))
-      (define (make-data-path instructions)
-	(define (all-instructions-filter)
-	  (my-sort (distinct (filter (lambda (instr) (pair? instr)) instructions)) car))
-	(define (register-label-filter)
-	  (distinct (map (lambda (instr) (register-exp-reg (goto-dest instr)))
-			 (filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'goto) (register-exp? (goto-dest instr))))
-				 instructions))))
-	(define (register-save-restore-filter)
-	  (distinct (map (lambda (instr) (stack-inst-reg-name instr))
-			 (filter (lambda (instr) (and (pair? instr) (or (eq? (car instr) 'save) (eq? (car instr) 'restore))))
-				 instructions))))
-	(define (assign-sources-filter)
-	  (define (iter registers result)
-	    (if (null? registers)
-	      result
-	      (let ((reg-record (car registers)))
-		(iter (cdr registers) (cons (cons (car reg-record)
-						  (map (lambda (instr) (assign-value-exp instr))
-						       (filter (lambda (instr) (and (pair? instr) (eq? (car instr) 'assign) (eq? (car reg-record) (assign-reg-name instr))))
-							       instructions))) result)))))
-	  (iter register-table '()))
-	(list (list 'all-instructions (all-instructions-filter))
-	      (list 'goto-registers (register-label-filter))
-	      (list 'register-save-restore (register-save-restore-filter))
-	      (list 'register-assignment (assign-sources-filter))))
-
-      (define (toggle-tracing value)
-	(set! tracing-enabled? value))
-
-      (define (toggle-tracing-for-all-registers value)
-	(for-each (lambda (reg-record)
-		    (let ((register (cadr reg-record)))
-		      (if value
-			(register 'enable-tracing)
-			(register 'disable-tracing))))
-		  register-table))
-
-      (define (toggle-tracing-for-select-registers registers value)
-	(for-each (lambda (name)
-		    (let ((register (lookup-register name)))
-		      (if value
-			(register 'enable-tracing)
-			(register 'disable-tracing))))
-		  registers))
-
+        (let ((insts (get-contents pc)))
+          (if (null? insts)
+              'done
+              (begin
+                ((instruction-execution-proc (car insts)))
+                (execute)))))
       (define (dispatch message)
-	(cond ((eq? message 'start)
-	       (set-contents! pc the-instruction-sequence)
-	       (execute))
-	      ((eq? message 'install-instruction-sequence)
-	       (lambda (seq-pair)
-		 (set! the-instruction-sequence (car seq-pair))
-		 (set! labels (cdr seq-pair))))
-	      ((eq? message 'allocate-register)
-	       allocate-register)
-	      ((eq? message 'get-register)
-	       lookup-register)
-	      ((eq? message 'install-operations)
-	       (lambda (ops)
-		 (set! the-ops (append the-ops ops))))
-	      ((eq? message 'stack) stack)
-	      ((eq? message 'operations) the-ops)
-	      ((eq? message 'install-data-path) (lambda (controller-text) (set! data-path (make-data-path controller-text))))
-	      ((eq? message 'data-path) data-path)
-	      ((eq? message 'register-table) register-table)
-	      ((eq? message 'instruction-sequence) the-instruction-sequence)
-	      ((eq? message 'labels) labels)
-	      ((eq? message 'print-instruction-execution-count) (print-instruction-execution-counter))
-	      ((eq? message 'reset-instruction-execution-counter) (reset-instruction-execution-counter))
-	      ((eq? message 'enable-tracing) (toggle-tracing #t))
-	      ((eq? message 'disable-tracing) (toggle-tracing #f))
-	      ((eq? message 'enable-tracing-for-all-registers) (toggle-tracing-for-all-registers #t))
-	      ((eq? message 'disable-tracing-for-all-registers) (toggle-tracing-for-all-registers #f))
-	      ((eq? message 'enable-tracing-for-select-registers) (lambda (registers) (toggle-tracing-for-select-registers registers #t)))
-	      ((eq? message 'disable-tracing-for-select-registers) (lambda (registers) (toggle-tracing-for-select-registers registers #f)))
-	      ((eq? message 'set-breakpoint) (lambda (label n) (toggle-breakpoint label n #t)))
-	      ((eq? message 'cancel-breakpoint) (lambda (label n) (toggle-breakpoint label n #f)))
-	      ((eq? message 'cancel-all-breakpoints) (cancel-all-breakpoints))
-	      ((eq? message 'proceed) (rest-execution (car (get-contents pc))))
-	      (else (error "Unknown request: MACHINE"
-			   message))))
+        (cond ((eq? message 'start)
+               (set-contents! pc the-instruction-sequence)
+               (execute))
+              ((eq? message 'install-instruction-sequence)
+               (lambda (seq) (set! the-instruction-sequence seq)))
+              ((eq? message 'allocate-register) allocate-register)
+              ((eq? message 'get-register) lookup-register)
+              ((eq? message 'install-operations)
+               (lambda (ops) (set! the-ops (append the-ops ops))))
+              ((eq? message 'stack) stack)
+              ((eq? message 'operations) the-ops)
+              (else (error "Unknown request -- MACHINE" message))))
       dispatch)))
 
-(define (start machine) (machine 'start))
+
+(define (start machine)
+  (machine 'start))
+
 (define (get-register-contents machine register-name)
   (get-contents (get-register machine register-name)))
-(define (set-register-contents! machine register-name value)
-  (set-contents! (get-register machine register-name)
-		 value)
-  'done)
 
-(define (set-breakpoint machine label n)
-  ((machine 'set-breakpoint) label n))
-(define (cancel-breakpoint machine label n)
-  ((machine 'cancel-breakpoint) label n))
-(define (cancel-all-breakpoints machine)
-  (machine 'cancel-all-breakpoints))
-(define (proceed-machine machine)
-  (machine 'proceed))
+(define (set-register-contents! machine register-name value)
+  (set-contents! (get-register machine register-name) value)
+  'done)
 
 (define (get-register machine reg-name)
   ((machine 'get-register) reg-name))
 
 (define (assemble controller-text machine)
-  (extract-labels
-    controller-text
+  (extract-labels controller-text
     (lambda (insts labels)
       (update-insts! insts labels machine)
-      (cons insts labels))))
+      insts)))
 
 (define (extract-labels text receive)
   (if (null? text)
-    (receive '() '())
-    (extract-labels
-      (cdr text)
-      (lambda (insts labels)
-	(let ((next-inst (car text)))
-	  (if (symbol? next-inst)
-	    (begin
-	      (if (not (null? insts))
-		(set-instruction-label! (car insts) next-inst))
-	      (receive insts
-		       (cons (make-label-entry next-inst
-					       insts)
-			     labels)))
-	    (receive (cons (make-instruction next-inst)
-			   insts)
-		     labels)))))))
+      (receive '() '())
+      (extract-labels (cdr text)
+       (lambda (insts labels)
+         (let ((next-inst (car text)))
+           (if (symbol? next-inst)
+               (receive insts
+                        (cons (make-label-entry next-inst
+                                                insts)
+                              labels))
+               (receive (cons (make-instruction next-inst)
+                              insts)
+                        labels)))))))
 
 (define (update-insts! insts labels machine)
   (let ((pc (get-register machine 'pc))
-	(flag (get-register machine 'flag))
-	(stack (machine 'stack))
-	(ops (machine 'operations)))
+        (flag (get-register machine 'flag))
+        (stack (machine 'stack))
+        (ops (machine 'operations)))
     (for-each
-      (lambda (inst)
-	(set-instruction-execution-proc!
-	  inst
-	  (make-execution-procedure
-	    (instruction-text inst)
-	    labels machine pc flag stack ops)))
-      insts)))
+     (lambda (inst)
+       (set-instruction-execution-proc! 
+        inst
+        (make-execution-procedure
+         (instruction-text inst) labels machine
+         pc flag stack ops)))
+     insts)))
 
-(define (make-instruction text) (list text '() #f #f))
-(define (instruction-text inst) (car inst))
-(define (instruction-execution-proc inst) (cadr inst))
-(define (instruction-label inst) (caddr inst))
-(define (instruction-breakpoint? inst) (cadddr inst))
+(define (make-instruction text)
+  (cons text '()))
+
+(define (instruction-text inst)
+  (car inst))
+
+(define (instruction-execution-proc inst)
+  (cdr inst))
+
 (define (set-instruction-execution-proc! inst proc)
-  (set-car! (cdr inst) proc))
-(define (set-instruction-label! inst label)
-  (set-car! (cddr inst) label))
-(define (set-instruction-breakpoint! inst value)
-  (set-car! (cdddr inst) value))
+  (set-cdr! inst proc))
 
 (define (make-label-entry label-name insts)
   (cons label-name insts))
@@ -346,46 +220,47 @@
 (define (lookup-label labels label-name)
   (let ((val (assoc label-name labels)))
     (if val
-      (cdr val)
-      (error "Undefined label: ASSEMBLE"
-	     label-name))))
+        (cdr val)
+        (error "Undefined label -- ASSEMBLE" label-name))))
 
-(define (make-execution-procedure
-	  inst labels machine pc flag stack ops)
+
+(define (make-execution-procedure inst labels machine
+                                  pc flag stack ops)
   (cond ((eq? (car inst) 'assign)
-	 (make-assign inst machine labels ops pc))
-	((eq? (car inst) 'test)
-	 (make-test inst machine labels ops flag pc))
-	((eq? (car inst) 'branch)
-	 (make-branch inst machine labels flag pc))
-	((eq? (car inst) 'goto)
-	 (make-goto inst machine labels pc))
-	((eq? (car inst) 'save)
-	 (make-save inst machine stack pc))
-	((eq? (car inst) 'restore)
-	 (make-restore inst machine stack pc))
-	((eq? (car inst) 'perform)
-	 (make-perform inst machine labels ops pc))
-	(else
-	  (error "Unknown instruction type: ASSEMBLE"
-		 inst))))
+         (make-assign inst machine labels ops pc))
+        ((eq? (car inst) 'test)
+         (make-test inst machine labels ops flag pc))
+        ((eq? (car inst) 'branch)
+         (make-branch inst machine labels flag pc))
+        ((eq? (car inst) 'goto)
+         (make-goto inst machine labels pc))
+        ((eq? (car inst) 'save)
+         (make-save inst machine stack pc))
+        ((eq? (car inst) 'restore)
+         (make-restore inst machine stack pc))
+        ((eq? (car inst) 'perform)
+         (make-perform inst machine labels ops pc))
+        (else (error "Unknown instruction type -- ASSEMBLE"
+                     inst))))
+
 
 (define (make-assign inst machine labels operations pc)
   (let ((target
-	  (get-register machine (assign-reg-name inst)))
-	(value-exp (assign-value-exp inst)))
+         (get-register machine (assign-reg-name inst)))
+        (value-exp (assign-value-exp inst)))
     (let ((value-proc
-	    (if (operation-exp? value-exp)
-	      (make-operation-exp
-		value-exp machine labels operations)
-	      (make-primitive-exp
-		(car value-exp) machine labels))))
-      (lambda () ; execution procedure for assign
-	(set-contents! target (value-proc))
-	(advance-pc pc)))))
+           (if (operation-exp? value-exp)
+               (make-operation-exp
+                value-exp machine labels operations)
+               (make-primitive-exp
+                (car value-exp) machine labels))))
+      (lambda ()                ; execution procedure for assign
+        (set-contents! target (value-proc))
+        (advance-pc pc)))))
 
 (define (assign-reg-name assign-instruction)
   (cadr assign-instruction))
+
 (define (assign-value-exp assign-instruction)
   (cddr assign-instruction))
 
@@ -395,101 +270,117 @@
 (define (make-test inst machine labels operations flag pc)
   (let ((condition (test-condition inst)))
     (if (operation-exp? condition)
-      (let ((condition-proc
-	      (make-operation-exp
-		condition machine labels operations)))
-	(lambda ()
-	  (set-contents! flag (condition-proc))
-	  (advance-pc pc)))
-      (error "Bad TEST instruction: ASSEMBLE" inst))))
+        (let ((condition-proc
+               (make-operation-exp
+                condition machine labels operations)))
+          (lambda ()
+            (set-contents! flag (condition-proc))
+            (advance-pc pc)))
+        (error "Bad TEST instruction -- ASSEMBLE" inst))))
+
 (define (test-condition test-instruction)
   (cdr test-instruction))
+
 
 (define (make-branch inst machine labels flag pc)
   (let ((dest (branch-dest inst)))
     (if (label-exp? dest)
-      (let ((insts
-	      (lookup-label
-		labels
-		(label-exp-label dest))))
-	(lambda ()
-	  (if (get-contents flag)
-	    (set-contents! pc insts)
-	    (advance-pc pc))))
-      (error "Bad BRANCH instruction: ASSEMBLE" inst))))
+        (let ((insts
+               (lookup-label labels (label-exp-label dest))))
+          (lambda ()
+            (if (get-contents flag)
+                (set-contents! pc insts)
+                (advance-pc pc))))
+        (error "Bad BRANCH instruction -- ASSEMBLE" inst))))
+
 (define (branch-dest branch-instruction)
   (cadr branch-instruction))
+
 
 (define (make-goto inst machine labels pc)
   (let ((dest (goto-dest inst)))
     (cond ((label-exp? dest)
-	   (let ((insts (lookup-label
-			  labels
-			  (label-exp-label dest))))
-	     (lambda () (set-contents! pc insts))))
-	  ((register-exp? dest)
-	   (let ((reg (get-register
-			machine
-			(register-exp-reg dest))))
-	     (lambda ()
-	       (set-contents! pc (get-contents reg)))))
-	  (else (error "Bad GOTO instruction: ASSEMBLE" inst)))))
+           (let ((insts
+                  (lookup-label labels
+                                (label-exp-label dest))))
+             (lambda () (set-contents! pc insts))))
+          ((register-exp? dest)
+           (let ((reg
+                  (get-register machine
+                                (register-exp-reg dest))))
+             (lambda ()
+               (set-contents! pc (get-contents reg)))))
+          (else (error "Bad GOTO instruction -- ASSEMBLE"
+                       inst)))))
+
 (define (goto-dest goto-instruction)
   (cadr goto-instruction))
 
 (define (make-save inst machine stack pc)
   (let ((reg (get-register machine
-			   (stack-inst-reg-name inst))))
+                           (stack-inst-reg-name inst))))
     (lambda ()
       (push stack (get-contents reg))
       (advance-pc pc))))
+
 (define (make-restore inst machine stack pc)
   (let ((reg (get-register machine
-			   (stack-inst-reg-name inst))))
+                           (stack-inst-reg-name inst))))
     (lambda ()
-      (set-contents! reg (pop stack))
+      (set-contents! reg (pop stack))    
       (advance-pc pc))))
+
 (define (stack-inst-reg-name stack-instruction)
   (cadr stack-instruction))
 
 (define (make-perform inst machine labels operations pc)
   (let ((action (perform-action inst)))
     (if (operation-exp? action)
-      (let ((action-proc
-	      (make-operation-exp
-		action machine labels operations)))
-	(lambda () (action-proc) (advance-pc pc)))
-      (error "Bad PERFORM instruction: ASSEMBLE" inst))))
+        (let ((action-proc
+               (make-operation-exp
+                action machine labels operations)))
+          (lambda ()
+            (action-proc)
+            (advance-pc pc)))
+        (error "Bad PERFORM instruction -- ASSEMBLE" inst))))
+
 (define (perform-action inst) (cdr inst))
 
 (define (make-primitive-exp exp machine labels)
   (cond ((constant-exp? exp)
-	 (let ((c (constant-exp-value exp)))
-	   (lambda () c)))
-	((label-exp? exp)
-	 (let ((insts (lookup-label
-			labels
-			(label-exp-label exp))))
-	   (lambda () insts)))
-	((register-exp? exp)
-	 (let ((r (get-register machine (register-exp-reg exp))))
-	   (lambda () (get-contents r))))
-	(else (error "Unknown expression type: ASSEMBLE" exp))))
+         (let ((c (constant-exp-value exp)))
+           (lambda () c)))
+        ((label-exp? exp)
+         (let ((insts
+                (lookup-label labels
+                              (label-exp-label exp))))
+           (lambda () insts)))
+        ((register-exp? exp)
+         (let ((r (get-register machine
+                                (register-exp-reg exp))))
+           (lambda () (get-contents r))))
+        (else
+         (error "Unknown expression type -- ASSEMBLE" exp))))
 
 (define (register-exp? exp) (tagged-list? exp 'reg))
+
 (define (register-exp-reg exp) (cadr exp))
+
 (define (constant-exp? exp) (tagged-list? exp 'const))
+
 (define (constant-exp-value exp) (cadr exp))
+
 (define (label-exp? exp) (tagged-list? exp 'label))
+
 (define (label-exp-label exp) (cadr exp))
 
+
 (define (make-operation-exp exp machine labels operations)
-  (let ((op (lookup-prim (operation-exp-op exp)
-			 operations))
-	(aprocs
-	  (map (lambda (e)
-		 (make-primitive-exp e machine labels))
-	       (operation-exp-operands exp))))
+  (let ((op (lookup-prim (operation-exp-op exp) operations))
+        (aprocs
+         (map (lambda (e)
+                (make-primitive-exp e machine labels))
+              (operation-exp-operands exp))))
     (lambda ()
       (apply op (map (lambda (p) (p)) aprocs)))))
 
@@ -500,12 +391,17 @@
 (define (operation-exp-operands operation-exp)
   (cdr operation-exp))
 
+
 (define (lookup-prim symbol operations)
   (let ((val (assoc symbol operations)))
     (if val
-      (cadr val)
-      (error "Unknown operation: ASSEMBLE"
-	     symbol))))
-
+        (cadr val)
+        (error "Unknown operation -- ASSEMBLE" symbol))))
+
+;; from 4.1
 (define (tagged-list? exp tag)
-  (and (pair? exp) (eq? tag (car exp))))
+  (if (pair? exp)
+      (eq? (car exp) tag)
+      false))
+
+'(REGISTER SIMULATOR LOADED)

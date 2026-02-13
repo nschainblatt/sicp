@@ -29,6 +29,7 @@
          (compile-definition exp target linkage))
         ((if? exp) (compile-if exp target linkage))
         ((let? exp) (compile (let->combination exp) target linkage))
+        ; ((map? exp) (compile-map exp target linkage))
         ((lambda? exp) (compile-lambda exp target linkage))
         ((begin? exp)
          (compile-sequence (begin-actions exp)
@@ -39,6 +40,27 @@
          (compile-application exp target linkage))
         (else
          (error "Unknown expression type -- COMPILE" exp))))
+;
+; (define (map? exp)
+;   (tagged-list? exp 'map))
+;
+; ;; (map callback sequence)
+; (define (map-callback exp)
+;   (cadr exp))
+; (define (map-sequence exp)
+;   (caddr exp))
+
+; (define (compile-map exp target linkage)
+;   ;; we have to generate code to iterate through a sequence
+;   ;; for each element in the sequence, apply the callback and add the
+;   ;; result to the result sequence
+;   ;; I suppose we don't have to make code to do that, we could just compile
+;   ;; a map procedure
+;   (define (map fn seq)
+;     (if (null? seq)
+;       '()
+;       (cons (fn (car seq)) (map fn (cdr seq)))))
+;   )
 
 (define (let? exp) (tagged-list? exp 'let))
 (define (let-bindings exp) (cadr exp))
